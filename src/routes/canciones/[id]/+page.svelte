@@ -56,6 +56,9 @@
 {:else}
 	<PageHeader title={data.song.title} subtitle={data.song.artist ?? ''}>
 		{#snippet action()}
+			<a class="btn btn-ghost" href={resolve('/canciones/[id]/alinear', { id: data.song.id })}>
+				<Icon name="lyrics" size={16} /> Alinear acordes
+			</a>
 			<button
 				class="icon-btn"
 				title="Editar"

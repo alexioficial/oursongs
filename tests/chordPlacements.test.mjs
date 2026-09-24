@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import {
+	movePlacement,
 	packChordRows,
+	placementOffsets,
 	placementsForLine,
 	remapPlacements,
 	removePlacementsForChord,
@@ -99,5 +101,24 @@ describe('posiciones visuales', () => {
 			{ chordId: 'c', offset: 9, column: 9, label: 'Em' }
 		]);
 		expect(rows.map((row) => row.map(({ chordId }) => chordId))).toEqual([['a', 'c'], ['b']]);
+	});
+
+	test('ofrece solo límites de grafemas como posiciones', () => {
+		expect(placementOffsets('a🎵b')).toEqual([0, 1, 3, 4]);
+	});
+
+	test('mueve una aparición al límite contiguo sin partir grafemas', () => {
+		expect(movePlacement([{ chordId: 'a', offset: 1 }], 1, 1, 'a🎵b')).toEqual([
+			{ chordId: 'a', offset: 3 }
+		]);
+	});
+
+	test('no mueve sobre otra aparición ni fuera de la letra', () => {
+		const placements = [
+			{ chordId: 'a', offset: 0 },
+			{ chordId: 'b', offset: 1 }
+		];
+		expect(movePlacement(placements, 0, 1, 'ab')).toEqual(placements);
+		expect(movePlacement(placements, 0, -1, 'ab')).toEqual(placements);
 	});
 });

@@ -32,6 +32,10 @@ export function splitGraphemes(text: string): GraphemePart[] {
 	}));
 }
 
+export function placementOffsets(text: string): number[] {
+	return [...splitGraphemes(text).map(({ offset }) => offset), text.length];
+}
+
 export function splitLyricLines(lyrics: string): LyricLine[] {
 	const lines: LyricLine[] = [];
 	let start = 0;
@@ -101,6 +105,29 @@ export function removePlacementsForChord(
 	chordId: string
 ): ChordPlacement[] {
 	return placements.filter((placement) => placement.chordId !== chordId);
+}
+
+export function movePlacement(
+	placements: ChordPlacement[],
+	currentOffset: number,
+	direction: -1 | 1,
+	lyrics: string
+): ChordPlacement[] {
+	const offsets = placementOffsets(lyrics);
+	const currentIndex = offsets.indexOf(currentOffset);
+	const targetOffset = offsets[currentIndex + direction];
+	if (
+		currentIndex === -1 ||
+		targetOffset === undefined ||
+		placements.some(({ offset }) => offset === targetOffset)
+	) {
+		return placements.map((placement) => ({ ...placement }));
+	}
+	return placements
+		.map((placement) =>
+			placement.offset === currentOffset ? { ...placement, offset: targetOffset } : { ...placement }
+		)
+		.sort((a, b) => a.offset - b.offset);
 }
 
 export function placementsForLine(
