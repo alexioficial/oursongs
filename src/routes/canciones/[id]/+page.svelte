@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import ChordBoard from '$lib/components/ChordBoard.svelte';
+	import ChordLyrics from '$lib/components/ChordLyrics.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import SongForm from '$lib/components/SongForm.svelte';
 	import { ClientApiError, jsonRequest } from '$lib/client/json';
@@ -20,7 +20,6 @@
 	const songTags = $derived(
 		data.song.tagIds.map((id) => tagsById.get(id)).filter((tag) => tag !== undefined)
 	);
-	const lyricsLines = $derived(data.song.lyrics ? data.song.lyrics.split('\n').length : 0);
 
 	async function onSaved() {
 		editing = false;
@@ -88,28 +87,13 @@
 
 	{#if error}<p class="error-text">{error}</p>{/if}
 
-	<ChordBoard chords={data.song.chords.map(({ value }) => value)} />
-
-	<section class="section">
-		<div class="section-head">
-			<h2 class="section-label">Letra</h2>
-			{#if lyricsLines > 0}
-				<span class="muted line-count mono">
-					{lyricsLines}
-					{lyricsLines === 1 ? 'línea' : 'líneas'}
-				</span>
-			{/if}
-		</div>
-
-		{#if data.song.lyrics}
-			<pre class="lyrics">{data.song.lyrics}</pre>
-		{:else}
-			<p class="muted empty-lyrics">
-				Esta canción todavía no tiene letra.
-				<button class="link-button" onclick={() => (editing = true)}>Añádela</button>.
-			</p>
-		{/if}
-	</section>
+	<ChordLyrics
+		lyrics={data.song.lyrics}
+		chords={data.song.chords}
+		placements={data.song.chordPlacements}
+		songId={data.song.id}
+		onEdit={() => (editing = true)}
+	/>
 
 	<p class="meta muted">
 		Actualizada
@@ -150,31 +134,6 @@
 		gap: 0.375rem;
 		margin-top: -1rem;
 		margin-bottom: 1rem;
-	}
-	.line-count {
-		font-size: 0.78rem;
-	}
-	.lyrics {
-		margin: 0;
-		color: var(--color-text);
-		font-family: var(--font-sans);
-		font-size: 1rem;
-		line-height: 1.7;
-		white-space: pre-wrap;
-		overflow-wrap: break-word;
-	}
-	.empty-lyrics {
-		margin: 0;
-		font-size: 0.9rem;
-	}
-	.link-button {
-		padding: 0;
-		border: 0;
-		background: none;
-		color: var(--color-text);
-		font: inherit;
-		text-decoration: underline;
-		cursor: pointer;
 	}
 	.meta {
 		margin: 2.5rem 0 0;

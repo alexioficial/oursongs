@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+	lineVisualWidth,
 	movePlacement,
 	packChordRows,
 	placementOffsets,
@@ -120,5 +121,19 @@ describe('posiciones visuales', () => {
 		];
 		expect(movePlacement(placements, 0, 1, 'ab')).toEqual(placements);
 		expect(movePlacement(placements, 0, -1, 'ab')).toEqual(placements);
+	});
+
+	test('mantiene en una fila acordes que tienen separación suficiente', () => {
+		const rows = packChordRows([
+			{ chordId: 'a', offset: 0, column: 0, label: 'C' },
+			{ chordId: 'b', offset: 8, column: 8, label: 'G#m7' }
+		]);
+		expect(rows).toHaveLength(1);
+		expect(rows[0].map(({ column }) => column)).toEqual([0, 8]);
+	});
+
+	test('el ancho visual incluye texto y acordes que sobresalen', () => {
+		expect(lineVisualWidth('', [{ chordId: 'a', offset: 0, column: 0, label: 'Cmaj7' }])).toBe(5);
+		expect(lineVisualWidth('a🎵b', [])).toBe(3);
 	});
 });

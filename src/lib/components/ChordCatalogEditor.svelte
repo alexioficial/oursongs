@@ -25,7 +25,14 @@
 			return;
 		}
 		const normalized = normalizeChord(value);
-		if (chords.some((chord) => chord.value === normalized)) {
+		if (
+			chords.some(
+				(chord) =>
+					typeof chord.value === 'string' &&
+					isValidChord(chord.value) &&
+					normalizeChord(chord.value) === normalized
+			)
+		) {
 			addError = 'Ese acorde ya está en el catálogo';
 			return;
 		}

@@ -164,3 +164,11 @@ export function packChordRows(items: PositionedChord[]): PositionedChord[][] {
 
 	return rows;
 }
+
+export function lineVisualWidth(text: string, chords: PositionedChord[]): number {
+	return Math.max(
+		1,
+		splitGraphemes(text).length,
+		...chords.map(({ column, label }) => column + label.length)
+	);
+}

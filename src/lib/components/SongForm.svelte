@@ -65,12 +65,18 @@
 
 		saving = true;
 		error = null;
+		const normalizedLyrics = lyrics.replace(/\r\n?/g, '\n').trim();
+		const normalizedPlacements = remapPlacements(
+			lyrics,
+			normalizedLyrics,
+			chordPlacements
+		).placements;
 		const payload = {
 			title: title.trim(),
 			artist: artist.trim(),
-			lyrics,
+			lyrics: normalizedLyrics,
 			chords,
-			chordPlacements,
+			chordPlacements: normalizedPlacements,
 			tagIds: selectedTagIds
 		};
 
