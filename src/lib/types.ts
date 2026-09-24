@@ -20,6 +20,21 @@ export interface TagWithCount extends Tag {
 	songCount: number;
 }
 
+export interface SongChord {
+	id: string;
+	value: string;
+}
+
+export interface SongChordInput {
+	id?: unknown;
+	value?: unknown;
+}
+
+export interface ChordPlacement {
+	chordId: string;
+	offset: number;
+}
+
 export interface SongSummary {
 	id: string;
 	title: string;

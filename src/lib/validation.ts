@@ -18,6 +18,7 @@ export const LYRICS_MAX_LENGTH = 20_000;
 export const TAG_NAME_MAX_LENGTH = 40;
 
 export const MAX_CHORDS_PER_SONG = 200;
+export const MAX_CHORD_PLACEMENTS_PER_SONG = 2_000;
 
 /** Tope del cuerpo JSON de la API: la letra es lo único que abulta. */
 export const MAX_JSON_BODY_BYTES = 64 * 1024;
