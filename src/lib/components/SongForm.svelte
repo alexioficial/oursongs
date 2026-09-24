@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import ChordCatalogEditor from './ChordCatalogEditor.svelte';
+	import ConfirmDialog from './ConfirmDialog.svelte';
 	import Icon from './Icon.svelte';
 	import TagPicker from './TagPicker.svelte';
 	import { ClientApiError, jsonRequest } from '$lib/client/json';
-	import { chordsFromText, chordsToText, isValidChord, normalizeChord } from '$lib/music/chords';
+	import { chordCatalogProblems } from '$lib/music/chordCatalog';
+	import { remapPlacements, removePlacementsForChord } from '$lib/music/chordPlacements';
 	import { ARTIST_MAX_LENGTH, LYRICS_MAX_LENGTH, TITLE_MAX_LENGTH } from '$lib/validation';
-	import type { Song, Tag } from '$lib/types';
+	import type { ChordPlacement, Song, SongChordInput, Tag } from '$lib/types';
 
 	interface Props {
 		/** Sin canción, el formulario crea una nueva. */
@@ -20,22 +23,43 @@
 	// `untrack` deja claro que solo interesa el valor inicial.
 	let title = $state(untrack(() => song?.title ?? ''));
 	let artist = $state(untrack(() => song?.artist ?? ''));
-	let chordsText = $state(
-		untrack(() => chordsToText(song?.chords.map(({ value }) => value) ?? []))
+	let chords = $state<SongChordInput[]>(
+		untrack(() => song?.chords.map((chord) => ({ ...chord })) ?? [])
 	);
 	let lyrics = $state(untrack(() => song?.lyrics ?? ''));
+	let chordPlacements = $state<ChordPlacement[]>(
+		untrack(() => song?.chordPlacements.map((placement) => ({ ...placement })) ?? [])
+	);
 	let selectedTagIds = $state<string[]>(untrack(() => [...(song?.tagIds ?? [])]));
+	let pendingChordDelete = $state<SongChordInput | null>(null);
+	let placementsNeedReview = $state(false);
 	let saving = $state(false);
 	let error = $state<string | null>(null);
 
-	const chords = $derived(chordsFromText(chordsText));
-	const invalid = $derived(chords.filter((chord) => !isValidChord(chord)));
+	const chordProblems = $derived(chordCatalogProblems(chords));
+	const assignedIds = $derived(chordPlacements.map(({ chordId }) => chordId));
+
+	function updateLyrics(event: Event) {
+		const nextLyrics = (event.currentTarget as HTMLTextAreaElement).value;
+		const remapped = remapPlacements(lyrics, nextLyrics, chordPlacements);
+		lyrics = nextLyrics;
+		chordPlacements = remapped.placements;
+		placementsNeedReview ||= remapped.needsReview;
+	}
+
+	function deletePendingChord() {
+		const chord = pendingChordDelete;
+		if (!chord || typeof chord.id !== 'string') return;
+		chords = chords.filter((current) => current.id !== chord.id);
+		chordPlacements = removePlacementsForChord(chordPlacements, chord.id);
+		pendingChordDelete = null;
+	}
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		if (saving) return;
-		if (invalid.length > 0) {
-			error = `Esto no lo entiendo como acorde: ${invalid.join(', ')}`;
+		if (chordProblems.some((problem) => problem !== null)) {
+			error = 'Corrige los acordes marcados antes de guardar';
 			return;
 		}
 
@@ -45,11 +69,8 @@
 			title: title.trim(),
 			artist: artist.trim(),
 			lyrics,
-			chords: chords.map((chord) => {
-				const value = normalizeChord(chord);
-				return song?.chords.find((current) => current.value === value) ?? { value };
-			}),
-			chordPlacements: song?.chordPlacements ?? [],
+			chords,
+			chordPlacements,
 			tagIds: selectedTagIds
 		};
 
@@ -96,29 +117,15 @@
 
 	<div class="field">
 		<label class="label" for="song-chords">Acordes</label>
-		<input
-			id="song-chords"
-			class="input mono"
-			bind:value={chordsText}
-			spellcheck="false"
-			autocapitalize="none"
-			autocorrect="off"
-			placeholder="C G Am F"
+		<ChordCatalogEditor
+			bind:chords
+			{assignedIds}
+			disabled={saving}
+			onDeleteRequested={(chord) => (pendingChordDelete = chord)}
 		/>
 		<p class="hint">
-			Uno detrás de otro, separados por espacios, comas o "|". Se guardan en este orden.
+			Registra una vez cada acorde que se usa. Después podrás alinearlo con la letra.
 		</p>
-
-		{#if chords.length > 0}
-			<div class="preview">
-				{#each chords as chord, index (index)}
-					<span class="preview-chord mono" class:bad={!isValidChord(chord)}>
-						{chord}
-						{#if !isValidChord(chord)}<Icon name="x" size={12} />{/if}
-					</span>
-				{/each}
-			</div>
-		{/if}
 	</div>
 
 	<div class="field">
@@ -131,9 +138,15 @@
 		<textarea
 			id="song-lyrics"
 			class="input lyrics"
-			bind:value={lyrics}
+			value={lyrics}
+			oninput={updateLyrics}
 			maxlength={LYRICS_MAX_LENGTH}
 			placeholder="Pega aquí la letra completa"></textarea>
+		{#if placementsNeedReview}
+			<p class="hint review-warning">
+				La letra cambió alrededor de un acorde. Revisa su alineación cuando guardes.
+			</p>
+		{/if}
 	</div>
 
 	{#if error}<p class="error-text">{error}</p>{/if}
@@ -147,6 +160,15 @@
 		</button>
 	</div>
 </form>
+
+<ConfirmDialog
+	open={pendingChordDelete !== null}
+	title="¿Quitar el acorde?"
+	message="Este acorde ya está colocado en la letra. ¿Quieres quitar también todas sus apariciones?"
+	confirmLabel="Quitar"
+	onConfirm={deletePendingChord}
+	onCancel={() => (pendingChordDelete = null)}
+/>
 
 <style>
 	.song-form {
@@ -165,27 +187,8 @@
 		min-height: 14rem;
 		font-size: 0.95rem;
 	}
-	.preview {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.375rem;
-		margin-top: 0.625rem;
-	}
-	.preview-chord {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.25rem;
-		padding: 0.25rem 0.5rem;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-control);
-		color: var(--color-text);
-		font-size: 0.85rem;
-	}
-	.preview-chord.bad {
-		border-color: var(--color-border-strong);
-		border-style: dashed;
-		color: var(--color-muted);
-		text-decoration: line-through;
+	.review-warning {
+		color: var(--color-subtle);
 	}
 	.actions {
 		display: flex;
