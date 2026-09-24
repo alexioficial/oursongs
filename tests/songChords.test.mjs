@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { normalizeChordCatalog, normalizeChordPlacements } from '../src/lib/server/songChords.ts';
+import {
+	normalizeChordCatalog,
+	normalizeChordPlacements,
+	normalizeSongChordState
+} from '../src/lib/server/songChords.ts';
 
 describe('catálogo de acordes', () => {
 	test('crea IDs y normaliza acordes nuevos', () => {
@@ -94,6 +98,41 @@ describe('apariciones de acordes', () => {
 	test('rechaza una posición que parte un grafema', () => {
 		expect(() => normalizeChordPlacements([{ chordId: 'c', offset: 2 }], chords, 'a🎵b')).toThrow(
 			'La posición del acorde no es válida'
+		);
+	});
+});
+
+describe('estado musical de una canción', () => {
+	const current = {
+		lyrics: 'hola',
+		chords: [{ id: 'c', value: 'C' }],
+		chordPlacements: [{ chordId: 'c', offset: 4 }]
+	};
+
+	test('renombra un acorde sin perder su aparición', () => {
+		expect(
+			normalizeSongChordState({ lyrics: 'hola', chords: [{ id: 'c', value: 'Cmaj7' }] }, current)
+		).toEqual({
+			chords: [{ id: 'c', value: 'Cmaj7' }],
+			chordPlacements: [{ chordId: 'c', offset: 4 }]
+		});
+	});
+
+	test('exige actualizar las apariciones al borrar un acorde usado', () => {
+		expect(() => normalizeSongChordState({ lyrics: 'hola', chords: [] }, current)).toThrow(
+			'Actualiza también la alineación de los acordes'
+		);
+	});
+
+	test('permite borrar acorde y apariciones en la misma operación', () => {
+		expect(
+			normalizeSongChordState({ lyrics: 'hola', chords: [], chordPlacements: [] }, current)
+		).toEqual({ chords: [], chordPlacements: [] });
+	});
+
+	test('exige remapear una posición que queda fuera al acortar la letra', () => {
+		expect(() => normalizeSongChordState({ lyrics: 'ho' }, current)).toThrow(
+			'Actualiza también la alineación de los acordes'
 		);
 	});
 });

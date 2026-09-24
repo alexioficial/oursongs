@@ -90,3 +90,48 @@ export function normalizeChordPlacements(
 		})
 		.sort((a, b) => a.offset - b.offset);
 }
+
+interface SongChordState {
+	lyrics: string;
+	chords: SongChord[];
+	chordPlacements: ChordPlacement[];
+}
+
+interface SongChordStateInput {
+	lyrics: string;
+	chords?: unknown;
+	chordPlacements?: unknown;
+}
+
+export function normalizeSongChordState(
+	input: SongChordStateInput,
+	current?: SongChordState
+): Pick<SongChordState, 'chords' | 'chordPlacements'> {
+	const chords =
+		input.chords === undefined
+			? (current?.chords ?? [])
+			: normalizeChordCatalog(input.chords, current?.chords ?? []);
+
+	if (input.chordPlacements !== undefined) {
+		return {
+			chords,
+			chordPlacements: normalizeChordPlacements(input.chordPlacements, chords, input.lyrics)
+		};
+	}
+
+	try {
+		return {
+			chords,
+			chordPlacements: normalizeChordPlacements(
+				current?.chordPlacements ?? [],
+				chords,
+				input.lyrics
+			)
+		};
+	} catch (error) {
+		if (error instanceof ValidationError && current) {
+			throw new ValidationError('Actualiza también la alineación de los acordes');
+		}
+		throw error;
+	}
+}

@@ -3,7 +3,7 @@
 	import Icon from './Icon.svelte';
 	import TagPicker from './TagPicker.svelte';
 	import { ClientApiError, jsonRequest } from '$lib/client/json';
-	import { chordsFromText, chordsToText, isValidChord } from '$lib/music/chords';
+	import { chordsFromText, chordsToText, isValidChord, normalizeChord } from '$lib/music/chords';
 	import { ARTIST_MAX_LENGTH, LYRICS_MAX_LENGTH, TITLE_MAX_LENGTH } from '$lib/validation';
 	import type { Song, Tag } from '$lib/types';
 
@@ -20,7 +20,9 @@
 	// `untrack` deja claro que solo interesa el valor inicial.
 	let title = $state(untrack(() => song?.title ?? ''));
 	let artist = $state(untrack(() => song?.artist ?? ''));
-	let chordsText = $state(untrack(() => chordsToText(song?.chords ?? [])));
+	let chordsText = $state(
+		untrack(() => chordsToText(song?.chords.map(({ value }) => value) ?? []))
+	);
 	let lyrics = $state(untrack(() => song?.lyrics ?? ''));
 	let selectedTagIds = $state<string[]>(untrack(() => [...(song?.tagIds ?? [])]));
 	let saving = $state(false);
@@ -43,7 +45,11 @@
 			title: title.trim(),
 			artist: artist.trim(),
 			lyrics,
-			chords,
+			chords: chords.map((chord) => {
+				const value = normalizeChord(chord);
+				return song?.chords.find((current) => current.value === value) ?? { value };
+			}),
+			chordPlacements: song?.chordPlacements ?? [],
 			tagIds: selectedTagIds
 		};
 

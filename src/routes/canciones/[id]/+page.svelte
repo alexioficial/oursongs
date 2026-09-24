@@ -85,7 +85,7 @@
 
 	{#if error}<p class="error-text">{error}</p>{/if}
 
-	<ChordBoard chords={data.song.chords} />
+	<ChordBoard chords={data.song.chords.map(({ value }) => value)} />
 
 	<section class="section">
 		<div class="section-head">

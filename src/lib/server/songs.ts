@@ -1,16 +1,11 @@
 import { ObjectId, type Db, type Filter } from 'mongodb';
 import { getDb } from './db';
 import { NotFoundError, ValidationError } from './errors';
+import { normalizeSongChordState } from './songChords';
 import { escapeRegex } from './text';
 import { resolveTagIds, toTagId } from './tags';
-import { isValidChord, normalizeChord } from '$lib/music/chords';
-import {
-	ARTIST_MAX_LENGTH,
-	LYRICS_MAX_LENGTH,
-	MAX_CHORDS_PER_SONG,
-	TITLE_MAX_LENGTH
-} from '$lib/validation';
-import type { Song, SongInput, SongSummary } from '$lib/types';
+import { ARTIST_MAX_LENGTH, LYRICS_MAX_LENGTH, TITLE_MAX_LENGTH } from '$lib/validation';
+import type { ChordPlacement, Song, SongChord, SongInput, SongSummary } from '$lib/types';
 
 const SONGS_COLLECTION = 'songs';
 
@@ -20,8 +15,10 @@ export interface SongDoc {
 	artist?: string;
 	/** La letra es un único string, con los saltos de línea normalizados. */
 	lyrics: string;
-	/** Un acorde por elemento, en forma canónica ('Am7', 'G#m7add11/D#'). */
-	chords: string[];
+	/** Catálogo sin orden musical; el id mantiene las apariciones al renombrar. */
+	chords: SongChord[];
+	/** Apariciones alineadas por offset con la letra. */
+	chordPlacements: ChordPlacement[];
 	tagIds: ObjectId[];
 	createdBy: ObjectId;
 	createdAt: Date;
@@ -30,7 +27,10 @@ export interface SongDoc {
 }
 
 /** Lo que necesita la lista: sin la letra, que es lo único que abulta. */
-type SongSummaryDoc = Omit<SongDoc, 'lyrics' | 'createdAt' | 'createdBy' | 'updatedBy'>;
+type SongSummaryDoc = Omit<
+	SongDoc,
+	'lyrics' | 'chordPlacements' | 'createdAt' | 'createdBy' | 'updatedBy'
+>;
 
 const SUMMARY_PROJECTION = { title: 1, artist: 1, chords: 1, tagIds: 1, updatedAt: 1 } as const;
 
@@ -39,7 +39,7 @@ export function toSongSummary(doc: SongSummaryDoc): SongSummary {
 		id: doc._id.toString(),
 		title: doc.title,
 		...(doc.artist && { artist: doc.artist }),
-		chords: doc.chords ?? [],
+		chords: (doc.chords ?? []).map((chord) => ({ ...chord })),
 		tagIds: (doc.tagIds ?? []).map((id) => id.toString()),
 		updatedAt: doc.updatedAt.toISOString()
 	};
@@ -49,6 +49,7 @@ export function toSong(doc: SongDoc): Song {
 	return {
 		...toSongSummary(doc),
 		lyrics: doc.lyrics ?? '',
+		chordPlacements: (doc.chordPlacements ?? []).map((placement) => ({ ...placement })),
 		createdAt: doc.createdAt.toISOString(),
 		createdBy: doc.createdBy.toString(),
 		...(doc.updatedBy && { updatedBy: doc.updatedBy.toString() })
@@ -95,21 +96,6 @@ function normalizeLyrics(lyrics: unknown): string {
 	return clean;
 }
 
-function normalizeChords(chords: unknown): string[] {
-	if (chords === undefined || chords === null) return [];
-	if (!Array.isArray(chords)) throw new ValidationError('Los acordes deben venir en una lista');
-	if (chords.length > MAX_CHORDS_PER_SONG) {
-		throw new ValidationError(`No se pueden guardar más de ${MAX_CHORDS_PER_SONG} acordes`);
-	}
-
-	return chords.map((chord) => {
-		if (typeof chord !== 'string' || !isValidChord(chord)) {
-			throw new ValidationError(`"${String(chord).slice(0, 24)}" no parece un acorde`);
-		}
-		return normalizeChord(chord);
-	});
-}
-
 export interface SongQuery {
 	search?: string;
 	/** Filtra por las canciones que lleven TODOS estos tags. */
@@ -149,11 +135,18 @@ export async function getSong(id: string): Promise<Song | null> {
 export async function createSong(input: SongInput, userId: ObjectId): Promise<Song> {
 	const now = new Date();
 	const artist = normalizeArtist(input.artist);
+	const lyrics = normalizeLyrics(input.lyrics);
+	const { chords, chordPlacements } = normalizeSongChordState({
+		lyrics,
+		chords: input.chords,
+		chordPlacements: input.chordPlacements
+	});
 	const doc = {
 		title: normalizeTitle(input.title),
 		...(artist && { artist }),
-		lyrics: normalizeLyrics(input.lyrics),
-		chords: normalizeChords(input.chords),
+		lyrics,
+		chords,
+		chordPlacements,
 		tagIds: await resolveTagIds(input.tagIds),
 		createdBy: userId,
 		createdAt: now,
@@ -172,6 +165,10 @@ export async function createSong(input: SongInput, userId: ObjectId): Promise<So
  */
 export async function updateSong(id: string, patch: SongInput, userId: ObjectId): Promise<Song> {
 	const songId = toSongId(id);
+	const db: Db = await getDb();
+	const current = await db.collection<SongDoc>(SONGS_COLLECTION).findOne({ _id: songId });
+	if (!current) throw new NotFoundError('La canción no existe');
+
 	const set: Partial<SongDoc> = {};
 	const unset: Partial<Record<keyof SongDoc, ''>> = {};
 
@@ -181,8 +178,22 @@ export async function updateSong(id: string, patch: SongInput, userId: ObjectId)
 		if (artist) set.artist = artist;
 		else unset.artist = '';
 	}
-	if (patch.lyrics !== undefined) set.lyrics = normalizeLyrics(patch.lyrics);
-	if (patch.chords !== undefined) set.chords = normalizeChords(patch.chords);
+	const lyrics = patch.lyrics === undefined ? current.lyrics : normalizeLyrics(patch.lyrics);
+	const chordState = normalizeSongChordState(
+		{
+			lyrics,
+			...(patch.chords !== undefined && { chords: patch.chords }),
+			...(patch.chordPlacements !== undefined && {
+				chordPlacements: patch.chordPlacements
+			})
+		},
+		current
+	);
+	if (patch.lyrics !== undefined) set.lyrics = lyrics;
+	if (patch.chords !== undefined) set.chords = chordState.chords;
+	if (patch.chordPlacements !== undefined) {
+		set.chordPlacements = chordState.chordPlacements;
+	}
 	if (patch.tagIds !== undefined) set.tagIds = await resolveTagIds(patch.tagIds);
 
 	if (Object.keys(set).length === 0 && Object.keys(unset).length === 0) {
@@ -192,7 +203,6 @@ export async function updateSong(id: string, patch: SongInput, userId: ObjectId)
 	set.updatedAt = new Date();
 	set.updatedBy = userId;
 
-	const db: Db = await getDb();
 	const updated = await db
 		.collection<SongDoc>(SONGS_COLLECTION)
 		.findOneAndUpdate(

@@ -40,13 +40,14 @@ export interface SongSummary {
 	title: string;
 	artist?: string;
 	/** Acordes tal como se guardaron: transponer es solo cosa de la vista. */
-	chords: string[];
+	chords: SongChord[];
 	tagIds: string[];
 	updatedAt: string;
 }
 
 export interface Song extends SongSummary {
 	lyrics: string;
+	chordPlacements: ChordPlacement[];
 	createdAt: string;
 	createdBy: string;
 	updatedBy?: string;
@@ -62,5 +63,6 @@ export interface SongInput {
 	artist?: unknown;
 	lyrics?: unknown;
 	chords?: unknown;
+	chordPlacements?: unknown;
 	tagIds?: unknown;
 }
