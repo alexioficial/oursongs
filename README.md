@@ -57,8 +57,9 @@ historial de la terminal puedes pasarla por `OURSONGS_PASSWORD`.
 - **Canciones** (`/canciones`) — lista con buscador por título/artista y filtro
   por tags (todo en la URL, así que un enlace reproduce la misma vista). Desde
   aquí se registra una canción nueva.
-  - **Ficha** (`/canciones/[id]`) — acordes con la transposición, letra completa,
-    edición y borrado.
+  - **Ficha** (`/canciones/[id]`) — acordes alineados sobre la letra, transposición,
+    edición y borrado. La pantalla `/canciones/[id]/alinear` permite colocar cada
+    aparición de un acorde en la posición exacta de la letra.
 - **Tags** (`/tags`) — crear, renombrar y borrar tags, y asignar un tag a varias
   canciones de golpe. Borrar un tag lo quita de sus canciones; las canciones no
   se tocan.
@@ -66,12 +67,17 @@ historial de la terminal puedes pasarla por `OURSONGS_PASSWORD`.
 Los tags también se asignan desde el formulario de la canción, que es el camino
 corto cuando estás registrándola.
 
-## La transposición
+## Los acordes y la transposición
 
-Una canción guarda sus acordes como una lista de strings, uno por acorde
-(`["C", "G/B", "Am7", "G#m7add11"]`). En la ficha hay un control para subir o
-bajar semitonos cuantas veces quieras: **es solo para ver**. Nunca se manda al
-servidor ni cambia lo guardado; al recargar vuelve a aparecer el original.
+Una canción guarda un catálogo sin orden con un identificador estable por acorde,
+y cada aparición en la letra referencia uno de esos identificadores junto con su
+posición. Así el mismo acorde se registra una vez y se puede colocar cuantas veces
+haga falta. Si la letra cambia, el formulario reajusta las posiciones y avisa
+cuando conviene revisarlas.
+
+En la ficha hay un control para subir o bajar semitonos cuantas veces quieras:
+**es solo para ver**. Nunca se manda al servidor ni cambia lo guardado; al recargar
+vuelve a aparecer el original.
 
 La lógica está en [`src/lib/music/chords.ts`](src/lib/music/chords.ts), es pura y
 está cubierta por `tests/chords.test.mjs`:
@@ -99,7 +105,8 @@ src/
     validation.ts           límites y formatos compartidos
     types.ts                tipos que cruzan al cliente (ids y fechas ya en string)
     client/json.ts          llamadas a la API desde el navegador
-    components/             UI (Icon, Nav, SongForm, ChordBoard, TagPicker…)
+    components/             UI (SongForm, ChordCatalogEditor, ChordAlignmentEditor,
+                            ChordLyrics, TagPicker…)
     server/
       db.ts                 conexión reusada + índices
       users.ts session.ts   cuentas y sesiones (token hasheado en la base)
@@ -112,6 +119,10 @@ src/
 scripts/createUser.ts       alta de usuarios (se conecta a Mongo por su cuenta)
 ```
 
+Para trabajar dentro del repo, `AGENTS.md` recoge las convenciones, las recetas y
+las trampas (por qué el driver está fijado, qué reglas de lint muerden, qué no
+tocar en la transposición).
+
 Las pantallas leen con `+page.server.ts` y escriben contra `/api/**`. La
 validación vive en `src/lib/server/*.ts`, así que la API no se fía de nada de lo
 que llega: cada campo entra como `unknown` y sale normalizado o con un 400.
@@ -122,8 +133,8 @@ que llega: cada campo entra como `unknown` y sale normalizado o con un 400.
   (scrypt de `node:crypto`), `name?`.
 - **sessions** — solo el `tokenHash` (SHA-256 del token de la cookie), con índice
   TTL para que Mongo limpie las vencidas.
-- **songs** — `title`, `artist?`, `lyrics` (un único string), `chords` (lista de
-  strings), `tagIds`, `createdBy`/`createdAt`, `updatedBy`/`updatedAt`.
+- **songs** — `title`, `artist?`, `lyrics`, catálogo `chords`, posiciones
+  `chordPlacements`, `tagIds`, `createdBy`/`createdAt`, `updatedBy`/`updatedAt`.
 - **tags** — `name` (único sin importar mayúsculas), `slug`.
 
 Los índices se crean al arrancar, en `ensureIndexes` de `src/lib/server/db.ts`.
