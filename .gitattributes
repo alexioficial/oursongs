@@ -1,0 +1,4 @@
+# Todo se guarda y se saca con saltos LF. El build corre en Linux y prettier
+# comprueba LF, así que dejar que Windows convierta a CRLF en el clone haría
+# fallar `bun run lint` sin que nadie haya tocado nada.
+* text=auto eol=lf

@@ -1,0 +1,367 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
+
+/*
+ * Paleta sin color: solo negros, grises y blancos. Lo que en otros proyectos
+ * sería el color primario aquí es --color-bright (blanco), y la jerarquía se
+ * apoya en el contraste, el borde y el peso de la tipografía.
+ */
+@theme {
+	--color-bg: #0a0a0a;
+	--color-surface: #121212;
+	--color-surface-2: #181818;
+	--color-elevated: #202020;
+	--color-border: #2b2b2b;
+	--color-border-soft: #1f1f1f;
+	--color-border-strong: #454545;
+	--color-muted: #6f6f6f;
+	--color-subtle: #a3a3a3;
+	--color-text: #ededed;
+	--color-bright: #ffffff;
+
+	--font-sans:
+		-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', Menlo, Consolas, monospace;
+
+	--radius-control: 0.25rem;
+	--radius-overlay: 0.5rem;
+}
+
+@layer base {
+	:root {
+		color-scheme: dark;
+	}
+	html {
+		min-width: 20rem;
+		background: var(--color-bg);
+		color: var(--color-text);
+		-webkit-text-size-adjust: 100%;
+		text-size-adjust: 100%;
+		scroll-padding-bottom: 5.5rem;
+	}
+	body {
+		min-height: 100dvh;
+		margin: 0;
+		background: var(--color-bg);
+		font-family: var(--font-sans);
+		font-size: 1rem;
+		line-height: 1.45;
+		-webkit-font-smoothing: antialiased;
+		text-rendering: optimizeLegibility;
+		overflow-x: hidden;
+		overscroll-behavior-y: none;
+	}
+	* {
+		box-sizing: border-box;
+		scrollbar-width: thin;
+		scrollbar-color: var(--color-border) transparent;
+	}
+	::selection {
+		background: var(--color-text);
+		color: var(--color-bg);
+	}
+	a,
+	button,
+	select,
+	input,
+	textarea,
+	label,
+	[role='button'] {
+		-webkit-tap-highlight-color: transparent;
+	}
+	a,
+	button,
+	select,
+	[role='button'] {
+		touch-action: manipulation;
+	}
+	h1,
+	h2,
+	h3,
+	p {
+		margin-block-start: 0;
+	}
+	h1,
+	h2,
+	h3 {
+		letter-spacing: -0.01em;
+	}
+	button,
+	input,
+	select,
+	textarea {
+		font: inherit;
+	}
+	button,
+	a,
+	input,
+	select,
+	textarea {
+		transition-duration: 150ms;
+		transition-property: background-color, border-color, color, opacity, transform;
+		transition-timing-function: ease-out;
+	}
+	:focus-visible {
+		outline: 2px solid var(--color-border-strong);
+		outline-offset: 2px;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		*,
+		*::before,
+		*::after {
+			scroll-behavior: auto !important;
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.01ms !important;
+		}
+	}
+	@media (min-width: 960px) {
+		html {
+			scroll-padding-bottom: 2rem;
+		}
+	}
+}
+
+@layer components {
+	.card {
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-overlay);
+	}
+	.card-hover {
+		transition:
+			border-color 150ms ease-out,
+			background-color 150ms ease-out;
+	}
+	@media (hover: hover) {
+		.card-hover:hover {
+			border-color: var(--color-border-strong);
+			background: var(--color-surface-2);
+		}
+	}
+
+	.btn {
+		display: inline-flex;
+		min-height: 2.75rem;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		padding: 0.625rem 1rem;
+		border: 1px solid transparent;
+		border-radius: var(--radius-control);
+		font-size: 0.9rem;
+		font-weight: 600;
+		line-height: 1;
+		white-space: nowrap;
+		cursor: pointer;
+		user-select: none;
+	}
+	.btn:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	.btn:active:not(:disabled) {
+		transform: translateY(1px);
+	}
+	.btn-primary {
+		background: var(--color-text);
+		color: var(--color-bg);
+	}
+	.btn-ghost {
+		background: transparent;
+		border-color: var(--color-border);
+		color: var(--color-text);
+	}
+	.btn-subtle {
+		background: var(--color-surface-2);
+		border-color: var(--color-border-soft);
+		color: var(--color-subtle);
+	}
+	/* Sin color rojo: lo destructivo se marca con borde claro y texto en blanco. */
+	.btn-danger {
+		background: transparent;
+		border-color: var(--color-border-strong);
+		color: var(--color-bright);
+	}
+	@media (hover: hover) {
+		.btn-primary:hover {
+			background: var(--color-bright);
+		}
+		.btn-ghost:hover {
+			border-color: var(--color-border-strong);
+			background: var(--color-surface);
+		}
+		.btn-subtle:hover {
+			background: var(--color-elevated);
+			color: var(--color-text);
+		}
+		.btn-danger:hover {
+			background: var(--color-elevated);
+		}
+	}
+	.btn-small {
+		min-height: 2.25rem;
+		padding: 0.4rem 0.7rem;
+		font-size: 0.8rem;
+	}
+
+	.icon-btn {
+		display: grid;
+		place-items: center;
+		width: 2.75rem;
+		height: 2.75rem;
+		border: 1px solid transparent;
+		border-radius: var(--radius-control);
+		background: transparent;
+		color: var(--color-subtle);
+		text-decoration: none;
+		cursor: pointer;
+	}
+	@media (hover: hover) {
+		.icon-btn:hover {
+			background: var(--color-surface);
+			color: var(--color-text);
+		}
+	}
+	.icon-btn:active {
+		background: var(--color-surface-2);
+	}
+	.icon-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	.input {
+		width: 100%;
+		min-height: 2.75rem;
+		padding: 0.625rem 0.75rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-control);
+		background: var(--color-surface-2);
+		color: var(--color-text);
+		font-size: 1rem;
+	}
+	.input::placeholder {
+		color: var(--color-muted);
+	}
+	.input:focus {
+		border-color: var(--color-border-strong);
+		outline: none;
+		background: var(--color-surface);
+	}
+	.input:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+	textarea.input {
+		min-height: 8rem;
+		line-height: 1.55;
+		resize: vertical;
+	}
+
+	.label {
+		display: block;
+		margin-bottom: 0.375rem;
+		color: var(--color-subtle);
+		font-size: 0.75rem;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		line-height: 1.2;
+		text-transform: uppercase;
+	}
+	.hint {
+		margin: 0.375rem 0 0;
+		color: var(--color-muted);
+		font-size: 0.78rem;
+		line-height: 1.4;
+	}
+	.error-text {
+		margin: 0.375rem 0 0;
+		color: var(--color-bright);
+		font-size: 0.82rem;
+		font-weight: 600;
+	}
+
+	.badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.1875rem 0.5rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-control);
+		color: var(--color-subtle);
+		font-size: 0.72rem;
+		font-weight: 600;
+		line-height: 1.25;
+		white-space: nowrap;
+	}
+	.badge-strong {
+		border-color: var(--color-border-strong);
+		color: var(--color-text);
+	}
+
+	/* Chip pulsable: filtros de tag y selección en formularios. */
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		min-height: 2.25rem;
+		padding: 0.375rem 0.7rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-control);
+		background: transparent;
+		color: var(--color-subtle);
+		font-size: 0.82rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	@media (hover: hover) {
+		.chip:hover {
+			border-color: var(--color-border-strong);
+			color: var(--color-text);
+		}
+	}
+	.chip[aria-pressed='true'] {
+		background: var(--color-text);
+		border-color: var(--color-text);
+		color: var(--color-bg);
+	}
+
+	.section {
+		border-top: 1px solid var(--color-border);
+		padding-top: 1.25rem;
+		margin-top: 2rem;
+	}
+	.section-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		flex-wrap: wrap;
+		margin-bottom: 1rem;
+	}
+	.section-label {
+		margin: 0;
+		color: var(--color-subtle);
+		font-size: 0.75rem;
+		font-weight: 600;
+		letter-spacing: 0.11em;
+		line-height: 1.2;
+		text-transform: uppercase;
+	}
+
+	.muted {
+		color: var(--color-muted);
+	}
+	.subtle {
+		color: var(--color-subtle);
+	}
+	.bright {
+		color: var(--color-bright);
+	}
+	.mono {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+	}
+}

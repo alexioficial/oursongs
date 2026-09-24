@@ -1,0 +1,22 @@
+node_modules
+.svelte-kit
+build
+
+# Entorno: en Coolify las variables las inyecta la plataforma.
+.env
+.env.*
+!.env.example
+
+# VCS, editores y herramientas
+.git
+.gitignore
+.vscode
+.claude
+.worktrees
+
+# Nada de esto entra en el build
+tests
+*.md
+eslint.config.js
+prettier.config.js
+.prettierignore
