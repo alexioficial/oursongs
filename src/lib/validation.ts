@@ -24,3 +24,6 @@ export const MAX_CHORD_PLACEMENTS_PER_SONG = 2_000;
 
 /** Tope del cuerpo JSON de la API: la letra es lo único que abulta. */
 export const MAX_JSON_BODY_BYTES = 64 * 1024;
+
+/** Ids que genera el cliente (acordes importados, canciones creadas sin conexión). */
+export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

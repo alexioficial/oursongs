@@ -24,9 +24,11 @@
 		placements: ChordPlacement[];
 		songId: string;
 		onEdit: () => void;
+		/** Sin conexión (o sin subir aún) no se ofrece editar ni alinear. */
+		readOnly?: boolean;
 	}
 
-	let { lyrics, chords, placements, songId, onEdit }: Props = $props();
+	let { lyrics, chords, placements, songId, onEdit, readOnly = false }: Props = $props();
 	let semitones = $state(0);
 	let accidentals = $state<Accidentals>('auto');
 
@@ -62,14 +64,16 @@
 	{#if !lyrics}
 		<p class="muted empty-lyrics">
 			Esta canción todavía no tiene letra.
-			<button class="link-button" onclick={onEdit}>Añádela</button>.
+			{#if !readOnly}<button class="link-button" onclick={onEdit}>Añádela</button>.{/if}
 		</p>
 	{:else if placements.length === 0}
 		<pre class="plain-lyrics">{lyrics}</pre>
-		<p class="alignment-hint muted">
-			Los acordes todavía no están ubicados en la letra.
-			<a href={resolve('/canciones/[id]/alinear', { id: songId })}>Alinearlos</a>
-		</p>
+		{#if !readOnly}
+			<p class="alignment-hint muted">
+				Los acordes todavía no están ubicados en la letra.
+				<a href={resolve('/canciones/[id]/alinear', { id: songId })}>Alinearlos</a>
+			</p>
+		{/if}
 	{:else}
 		<div class="song-sheet" aria-label="Letra con acordes">
 			{#each lines as line (line.start)}

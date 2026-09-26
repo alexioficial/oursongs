@@ -98,17 +98,18 @@ quedaría con valores viejos horneados en la imagen.
 
 ### 3.4. Las fechas se formatean en el servidor
 
-`src/routes/canciones/[id]/+page.server.ts` devuelve `updatedAtLabel` ya
-formateado. Si formateas en el componente, el HTML del servidor (UTC) y el del
-cliente (zona del usuario) no coinciden y salta el aviso de hidratación. La zona
-sale de `TZ`.
+`GET /api/songs/[id]` (y la descarga sin conexión) devuelven `updatedAtLabel` ya
+formateado con `formatUpdatedAt` de `$lib/server/dates.ts`. Si formateas en el
+componente, el HTML del servidor (UTC) y el del cliente (zona del usuario) no
+coinciden y salta el aviso de hidratación. La zona sale de `TZ`.
 
 ### 3.5. Toda ruta pública nueva va a `PUBLIC_ROUTES`
 
 `src/hooks.server.ts` bloquea **todo** lo que no esté en ese `Set`: las páginas
 con un redirect a `/login`, y lo que empiece por `/api/` con un 401 JSON (un
 redirect haría que el `fetch` del cliente recibiera el HTML del login en vez de
-un error). Hoy la lista es `/login`, `/api/auth/login` y `/api/health`. Añadir un
+un error). Hoy la lista es `/login`, `/api/auth/login`, `/api/health` y
+`/api/session` (el layout la pide también en `/login`). Añadir un
 endpoint público y olvidarse de esto es el fallo más fácil de cometer aquí — le
 pasó a `/api/health`, que existía pero contestaba 401 al healthcheck.
 
@@ -116,9 +117,16 @@ pasó a `/api/health`, que existía pero contestaba 401 al healthcheck.
 
 ## 4. Por dónde pasa una petición
 
-**Leer** → `+page.server.ts` llama a los módulos de `$lib/server/` y devuelve DTOs
-ya serializados (ids y fechas como `string`, ver `src/lib/types.ts`). Nunca se
-devuelve un `ObjectId` ni un `Date` al cliente.
+**Leer** → hay dos caminos, y cuál usa cada pantalla importa (§4.1):
+
+- **Canciones y layout raíz**: carga **universal** (`+page.ts` / `+layout.ts`) que
+  pide JSON a `GET /api/**` con `apiGet()` de `$lib/offline/load.ts`. Si el
+  servidor no responde, lee la copia de IndexedDB.
+- **Tags y Alinear**: `+page.server.ts`, que llama a `$lib/server/` directamente.
+  Son pantallas de edición y sin red no tienen sentido.
+
+En los dos casos salen DTOs ya serializados (ids y fechas como `string`, ver
+`src/lib/types.ts`). Nunca se devuelve un `ObjectId` ni un `Date` al cliente.
 
 **Escribir** → el componente llama a `jsonRequest()` de `$lib/client/json.ts`
 contra `/api/**`, el endpoint valida con los módulos de `$lib/server/` y el
@@ -135,6 +143,10 @@ src/
     types.ts                 DTOs que cruzan al cliente
     client/json.ts           fetch + traducción de `{ error }` a excepción
     client/ids.ts            UUID en el navegador (también sin https)
+    offline/                 modo sin conexión (§4.1): db.ts (IndexedDB),
+                             sync.svelte.ts (estado y sincronización),
+                             load.ts (apiGet), logic.ts (puro, con tests)
+    theme.ts                 tema claro/oscuro en cookie
     components/              Icon, Nav, PageHeader, EmptyState, Modal,
                              ConfirmDialog, SongForm, TagPicker, ChordLyrics,
                              ChordCatalogEditor, ChordAlignmentEditor
@@ -149,10 +161,41 @@ src/
       text.ts                escapeRegex, slugify
   routes/
     canciones/  tags/  login/
-    api/                     solo escritura (POST/PATCH/PUT/DELETE)
+    app-shell/               carcasa sin SSR que el service worker sirve sin red
+    api/                     escritura + lecturas JSON de las cargas universales
+  service-worker.ts          archivos de la app y la carcasa; nunca datos
 scripts/createUser.ts        alta de usuarios (fuera de SvelteKit)
 tests/*.test.mjs             bun:test importando el .ts directamente
 ```
+
+### 4.1. Sin conexión
+
+Cada vez que alguien entra (y cada vez que vuelve la red), `startOffline()` sube
+las canciones creadas sin conexión y descarga el repertorio **entero** a
+IndexedDB (`GET /api/offline/songs`, por páginas para enseñar el progreso en
+`SyncStatus`). Sin servidor se puede ver todo y **solo crear**. Editar, borrar,
+alinear y Tags quedan bloqueados (`connection.online`).
+
+Lo que no se puede romper:
+
+- **Nada de carga de servidor en el layout raíz ni en `canciones/`.** Si la hay,
+  SvelteKit tiene que pedir sus datos al servidor antes de pintar y sin red la
+  página falla. Por eso esas cargas son universales.
+- **`paths.relative = false`** (`vite.config.ts`). Sin red, el service worker
+  sirve la misma carcasa para cualquier URL, y con rutas relativas
+  `/canciones/abc` buscaría `/canciones/_app/...` y no arrancaría.
+- **El service worker no guarda datos**: ni `/api/**` ni `__data.json`. Los datos
+  viven en IndexedDB. Una caché HTTP de datos serviría canciones viejas incluso
+  con red.
+- **Crear es idempotente por `clientId`** (UUID del cliente, índice único
+  parcial). Si la subida se corta después de guardar, el reintento devuelve la
+  misma canción en vez de duplicarla.
+- **Cerrar sesión borra la copia** (`clearOfflineData`); si hay canciones sin
+  subir, se avisa antes.
+
+Para probarlo de verdad hace falta el build de producción: en `bun run dev`, Vite
+sirve los módulos bajo demanda y el service worker no puede guardarlos. Apagar el
+servidor es la forma realista de simular que no hay internet.
 
 ---
 
@@ -168,12 +211,12 @@ privacidad, hay que añadir filtros en todas las consultas de `songs.ts` y
 
 ### 5.2. Colecciones e invariantes
 
-| Colección  | Campos                                                                                                            |
-| ---------- | ----------------------------------------------------------------------------------------------------------------- |
-| `users`    | `username` (único, insensible a mayúsculas), `passwordHash` (scrypt), `name?`                                     |
-| `sessions` | `tokenHash` (SHA-256 del token de la cookie), `userId`, `expiresAt` (índice TTL)                                  |
-| `songs`    | `title`, `artist?`, `rhythm?`, `lyrics`, `chords` (`{id,value}[]`), `chordPlacements`, `tagIds`, autoría y fechas |
-| `tags`     | `name` (único, insensible a mayúsculas), `slug` (único)                                                           |
+| Colección  | Campos                                                                                                                         |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `users`    | `username` (único, insensible a mayúsculas), `passwordHash` (scrypt), `name?`                                                  |
+| `sessions` | `tokenHash` (SHA-256 del token de la cookie), `userId`, `expiresAt` (índice TTL)                                               |
+| `songs`    | `title`, `artist?`, `rhythm?`, `lyrics`, `chords` (`{id,value}[]`), `chordPlacements`, `tagIds`, `clientId?`, autoría y fechas |
+| `tags`     | `name` (único, insensible a mayúsculas), `slug` (único)                                                                        |
 
 Índices en `ensureIndexes` de `db.ts`; se crean al arrancar y `ensureIndex`
 recrea el índice si choca por opciones (códigos 85/86). Sesiones: 30 días, y
@@ -359,7 +402,8 @@ de dominio, `return json(...)` y `catch` con `return failure(error)`. La
 validación va en el módulo de `$lib/server/`, no en el endpoint. Si tiene que ser
 público, §3.5.
 
-**Una pantalla nueva**: carpeta en `src/routes/`, `+page.server.ts` que devuelva
+**Una pantalla nueva**: carpeta en `src/routes/`, `+page.server.ts` (o `+page.ts`
+con `apiGet()` si tiene que verse sin conexión, §4.1) que devuelva
 DTOs, `+page.svelte` con `PageHeader` y las clases de `layout.css`, y la entrada en
 `Nav.svelte` (con `resolve()`).
 

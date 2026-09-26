@@ -7,6 +7,12 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import SongForm from '$lib/components/SongForm.svelte';
 	import { ClientApiError, jsonRequest } from '$lib/client/json';
+	import {
+		connection,
+		discardPendingSong,
+		pending,
+		retryPendingSong
+	} from '$lib/offline/sync.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -17,6 +23,26 @@
 	let error = $state<string | null>(null);
 
 	const tagsById = $derived(new Map(data.tags.map((tag) => [tag.id, tag])));
+	// Sin conexión, o si aún no se subió, la canción solo se puede ver.
+	const readOnly = $derived(!connection.online || data.pending !== null);
+
+	// Cuando la canción creada sin conexión se sube, esta URL (su id local) deja
+	// de valer: se salta a la de verdad.
+	$effect(() => {
+		const realId = data.pending ? pending.synced[data.pending.clientId] : undefined;
+		if (realId) goto(resolve('/canciones/[id]', { id: realId }), { replaceState: true });
+	});
+
+	function retry() {
+		if (data.pending) void retryPendingSong(data.pending.clientId);
+	}
+
+	async function discard() {
+		if (!data.pending) return;
+		await discardPendingSong(data.pending.clientId);
+		await goto(resolve('/canciones'));
+	}
+
 	const songTags = $derived(
 		data.song.tagIds.map((id) => tagsById.get(id)).filter((tag) => tag !== undefined)
 	);
@@ -55,25 +81,27 @@
 {:else}
 	<PageHeader title={data.song.title} subtitle={data.song.artist ?? ''}>
 		{#snippet action()}
-			<a class="btn btn-ghost" href={resolve('/canciones/[id]/alinear', { id: data.song.id })}>
-				<Icon name="lyrics" size={16} /> Alinear acordes
-			</a>
-			<button
-				class="icon-btn"
-				title="Editar"
-				aria-label="Editar canción"
-				onclick={() => (editing = true)}
-			>
-				<Icon name="pencil" size={18} />
-			</button>
-			<button
-				class="icon-btn"
-				title="Eliminar"
-				aria-label="Eliminar canción"
-				onclick={() => (confirmingDelete = true)}
-			>
-				<Icon name="trash" size={18} />
-			</button>
+			{#if !readOnly}
+				<a class="btn btn-ghost" href={resolve('/canciones/[id]/alinear', { id: data.song.id })}>
+					<Icon name="lyrics" size={16} /> Alinear acordes
+				</a>
+				<button
+					class="icon-btn"
+					title="Editar"
+					aria-label="Editar canción"
+					onclick={() => (editing = true)}
+				>
+					<Icon name="pencil" size={18} />
+				</button>
+				<button
+					class="icon-btn"
+					title="Eliminar"
+					aria-label="Eliminar canción"
+					onclick={() => (confirmingDelete = true)}
+				>
+					<Icon name="trash" size={18} />
+				</button>
+			{/if}
 		{/snippet}
 	</PageHeader>
 
@@ -91,6 +119,22 @@
 		</div>
 	{/if}
 
+	{#if data.pending?.error}
+		<div class="notice">
+			<p>No se pudo subir: {data.pending.error}</p>
+			<div class="notice-actions">
+				<button class="btn btn-subtle" onclick={retry}>Reintentar</button>
+				<button class="btn btn-danger" onclick={discard}>Descartar</button>
+			</div>
+		</div>
+	{:else if data.pending}
+		<p class="notice muted">
+			Creada sin conexión. Se subirá sola cuando haya internet; hasta entonces no se puede editar.
+		</p>
+	{:else if !connection.online}
+		<p class="notice muted">Sin conexión: la canción se puede ver, pero no editar.</p>
+	{/if}
+
 	{#if error}<p class="error-text">{error}</p>{/if}
 
 	<ChordLyrics
@@ -99,12 +143,15 @@
 		placements={data.song.chordPlacements}
 		songId={data.song.id}
 		onEdit={() => (editing = true)}
+		{readOnly}
 	/>
 
-	<p class="meta muted">
-		Actualizada
-		<time datetime={data.song.updatedAt}>{data.updatedAtLabel}</time>
-	</p>
+	{#if !data.pending}
+		<p class="meta muted">
+			Actualizada
+			<time datetime={data.song.updatedAt}>{data.updatedAtLabel}</time>
+		</p>
+	{/if}
 {/if}
 
 <ConfirmDialog
@@ -140,6 +187,22 @@
 		gap: 0.375rem;
 		margin-top: -1rem;
 		margin-bottom: 1rem;
+	}
+	.notice {
+		margin: 0 0 1rem;
+		padding: 0.75rem 1rem;
+		border: 1px dashed var(--color-border-strong);
+		border-radius: var(--radius-control);
+		font-size: 0.85rem;
+	}
+	.notice p {
+		margin: 0;
+	}
+	.notice-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-top: 0.75rem;
 	}
 	.meta {
 		margin: 2.5rem 0 0;

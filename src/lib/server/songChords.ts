@@ -1,17 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { isValidChord, normalizeChord } from '../music/chords';
 import { splitGraphemes } from '../music/chordPlacements';
-import { MAX_CHORDS_PER_SONG, MAX_CHORD_PLACEMENTS_PER_SONG } from '../validation';
+import { MAX_CHORDS_PER_SONG, MAX_CHORD_PLACEMENTS_PER_SONG, UUID_REGEX } from '../validation';
 import type { ChordPlacement, SongChord, SongChordInput } from '../types';
 import { ValidationError } from './errors';
-
-/**
- * Un acorde nuevo puede traer su id desde el cliente cuando hace falta
- * referirse a él antes de guardarlo: al importar una letra con acordes, las
- * apariciones apuntan a acordes que todavía no existen. Solo se acepta con
- * formato de UUID, que es lo que genera el propio servidor.
- */
-const CLIENT_CHORD_ID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -39,8 +31,11 @@ export function normalizeChordCatalog(
 		if (input.id === undefined) {
 			id = createId();
 		} else {
+			// Un id desconocido solo vale si es un UUID: el cliente lo genera cuando
+			// necesita apuntar a un acorde antes de guardarlo (al importar una letra
+			// con acordes, o al crear una canción sin conexión).
 			const known = typeof input.id === 'string' && currentIds.has(input.id);
-			if (typeof input.id !== 'string' || (!known && !CLIENT_CHORD_ID_REGEX.test(input.id))) {
+			if (typeof input.id !== 'string' || (!known && !UUID_REGEX.test(input.id))) {
 				throw new ValidationError('El acorde indicado ya no existe');
 			}
 			id = input.id;

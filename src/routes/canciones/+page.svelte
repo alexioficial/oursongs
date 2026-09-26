@@ -7,6 +7,8 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import SongForm from '$lib/components/SongForm.svelte';
+	import { filterSongs, pendingToSong, toSummary } from '$lib/offline/logic';
+	import { pending } from '$lib/offline/sync.svelte';
 	import type { Song } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -28,6 +30,18 @@
 	});
 
 	const tagsById = $derived(new Map(data.tags.map((tag) => [tag.id, tag])));
+	// Lo creado sin conexión va arriba, con la misma búsqueda que el resto.
+	const pendingSongs = $derived(
+		filterSongs(
+			pending.songs.map((song) => ({
+				...toSummary(pendingToSong(song)),
+				failed: song.error !== undefined
+			})),
+			data.search,
+			data.tagIds
+		)
+	);
+	const total = $derived(data.songs.length + pendingSongs.length);
 	const filtering = $derived(data.search !== '' || data.tagIds.length > 0);
 
 	function apply(search: string, tagIds: string[]) {
@@ -71,10 +85,7 @@
 
 <svelte:head><title>Canciones · OurSongs</title></svelte:head>
 
-<PageHeader
-	title="Canciones"
-	subtitle={data.songs.length === 1 ? '1 canción' : `${data.songs.length} canciones`}
->
+<PageHeader title="Canciones" subtitle={total === 1 ? '1 canción' : `${total} canciones`}>
 	{#snippet action()}
 		<button class="btn btn-primary" onclick={() => (creating = true)}>
 			<Icon name="plus" size={16} /> Nueva
@@ -111,7 +122,7 @@
 	{/if}
 </div>
 
-{#if data.songs.length === 0}
+{#if total === 0}
 	{#if filtering}
 		<EmptyState
 			icon="search"
@@ -132,6 +143,25 @@
 	{/if}
 {:else}
 	<ul class="song-list">
+		{#each pendingSongs as song (song.id)}
+			<li>
+				<a class="card card-hover song" href={resolve('/canciones/[id]', { id: song.id })}>
+					<div class="song-main">
+						<h2 class="song-title">{song.title}</h2>
+						{#if song.artist || song.rhythm}
+							<p class="song-artist muted">
+								{[song.artist, song.rhythm].filter(Boolean).join(' · ')}
+							</p>
+						{/if}
+					</div>
+					<div class="song-side">
+						<span class="badge pending-badge">{song.failed ? 'No se pudo subir' : 'Sin subir'}</span
+						>
+						<Icon name="chevron" size={16} />
+					</div>
+				</a>
+			</li>
+		{/each}
 		{#each data.songs as song (song.id)}
 			<li>
 				<a class="card card-hover song" href={resolve('/canciones/[id]', { id: song.id })}>
@@ -240,6 +270,10 @@
 		flex-wrap: wrap;
 		gap: 0.25rem;
 		margin-top: 0.5rem;
+	}
+	.pending-badge {
+		border-style: dashed;
+		white-space: nowrap;
 	}
 	.song-side {
 		display: flex;

@@ -55,7 +55,7 @@ historial de la terminal puedes pasarla por `OURSONGS_PASSWORD`.
 El detalle está en [`USUARIOS.md`](USUARIOS.md): reglas de usuario y contraseña,
 cambio de contraseña, alta desde el terminal de Coolify y baja de una cuenta.
 
-## Las dos pantallas
+## Las pantallas
 
 - **Canciones** (`/canciones`) — lista con buscador por título/artista y filtro
   por tags (todo en la URL, así que un enlace reproduce la misma vista). Desde
@@ -74,6 +74,23 @@ cambio de contraseña, alta desde el terminal de Coolify y baja de una cuenta.
 
 Los tags también se asignan desde el formulario de la canción, que es el camino
 corto cuando estás registrándola.
+
+## Sin conexión
+
+Cada vez que alguien entra, la app descarga en segundo plano el repertorio
+entero, con letra, acordes y tags, y lo guarda en el dispositivo. Una barra
+pequeña abajo a la derecha enseña el progreso. Si luego se va internet, o la app
+se abre sin él, las canciones siguen ahí: se pueden ver, buscar, filtrar por tags
+y transponer.
+
+Sin conexión **solo se puede crear**: editar, borrar, alinear y la pantalla de
+Tags necesitan al servidor. Lo creado queda marcado "Sin subir" y se sube solo al
+volver la conexión, y en ese momento también se descargan las canciones nuevas
+que haya. Si el servidor rechaza alguna (por ejemplo, un dato inválido), se queda
+marcada con el motivo para reintentarla o descartarla.
+
+Cerrar sesión borra la copia del dispositivo; si hay canciones sin subir, avisa
+antes.
 
 ## Los acordes y la transposición
 
@@ -131,7 +148,9 @@ Para trabajar dentro del repo, `AGENTS.md` recoge las convenciones, las recetas 
 las trampas (por qué el driver está fijado, qué reglas de lint muerden, qué no
 tocar en la transposición).
 
-Las pantallas leen con `+page.server.ts` y escriben contra `/api/**`. La
+Las pantallas de canciones leen con cargas universales contra `GET /api/**` (así
+pueden tirar de la copia del dispositivo sin conexión), Tags y Alinear con
+`+page.server.ts`, y todas escriben contra `/api/**`. La
 validación vive en `src/lib/server/*.ts`, así que la API no se fía de nada de lo
 que llega: cada campo entra como `unknown` y sale normalizado o con un 400.
 

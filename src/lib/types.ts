@@ -67,4 +67,30 @@ export interface SongInput {
 	chords?: unknown;
 	chordPlacements?: unknown;
 	tagIds?: unknown;
+	/** UUID del cliente: repetir el alta con el mismo no crea otra canción. */
+	clientId?: unknown;
+}
+
+/** La ficha de una canción, con la fecha ya formateada en el servidor. */
+export interface SongDetail {
+	song: Song;
+	updatedAtLabel: string;
+}
+
+/** Lo que se guarda en el dispositivo para verla sin conexión. */
+export interface OfflineSong extends Song {
+	updatedAtLabel: string;
+}
+
+export interface OfflineSongPage {
+	songs: OfflineSong[];
+	total: number;
+	next: string | null;
+	/** Solo en la primera página. */
+	tags?: Tag[];
+}
+
+export interface SessionInfo {
+	user: SessionUser | null;
+	theme: 'light' | 'dark';
 }

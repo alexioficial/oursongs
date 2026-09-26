@@ -1,6 +1,14 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { createTag } from '$lib/server/tags';
+import { createTag, listTags } from '$lib/server/tags';
 import { failure, readObjectBody, requireUserId } from '$lib/server/apiHelpers';
+
+export const GET: RequestHandler = async () => {
+	try {
+		return json(await listTags());
+	} catch (error) {
+		return failure(error);
+	}
+};
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {

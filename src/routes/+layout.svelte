@@ -6,6 +6,9 @@
 	import { resolve } from '$app/paths';
 	import Nav from '$lib/components/Nav.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import SyncStatus from '$lib/components/SyncStatus.svelte';
+	import { clearOfflineData, pending, startOffline } from '$lib/offline/sync.svelte';
 	import { THEME_COOKIE, type Theme } from '$lib/theme';
 	import type { LayoutData } from './$types';
 
@@ -24,7 +27,21 @@
 		document.cookie = `${THEME_COOKIE}=${theme}; path=/; max-age=31536000; samesite=lax`;
 	}
 
-	async function logout() {
+	// Cada entrada a la app sube lo pendiente y descarga el repertorio entero.
+	$effect(() => {
+		if (data.user) startOffline(data.user);
+	});
+
+	let confirmingLogout = $state(false);
+
+	function logout() {
+		// Cerrar sesión borra la copia del dispositivo, y con ella lo no subido.
+		if (pending.songs.length > 0) confirmingLogout = true;
+		else void signOut();
+	}
+
+	async function signOut() {
+		await clearOfflineData();
 		await fetch('/api/auth/logout', {
 			method: 'POST',
 			headers: { accept: 'application/json' }
@@ -103,7 +120,17 @@
 		</div>
 
 		<Nav variant="bottom" />
+		<SyncStatus />
 	</div>
+
+	<ConfirmDialog
+		open={confirmingLogout}
+		title="¿Cerrar sesión?"
+		message={`Tienes ${pending.songs.length} ${pending.songs.length === 1 ? 'canción' : 'canciones'} sin subir. Si cierras sesión ahora se perderán.`}
+		confirmLabel="Cerrar sesión"
+		onConfirm={signOut}
+		onCancel={() => (confirmingLogout = false)}
+	/>
 {/if}
 
 <style>

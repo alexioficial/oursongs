@@ -14,6 +14,8 @@
 		trimLyrics
 	} from '$lib/music/chordPlacements';
 	import { applyChordSheet, parseChordSheet } from '$lib/music/chordSheet';
+	import { pendingToSong, prepareChords, type PendingSongInput } from '$lib/offline/logic';
+	import { connection, savePendingSong } from '$lib/offline/sync.svelte';
 	import {
 		ARTIST_MAX_LENGTH,
 		LYRICS_MAX_LENGTH,
@@ -46,6 +48,9 @@
 		untrack(() => song?.chordPlacements.map((placement) => ({ ...placement })) ?? [])
 	);
 	let selectedTagIds = $state<string[]>(untrack(() => [...(song?.tagIds ?? [])]));
+	// Id propio de la canción nueva: si la red se cae a mitad del guardado, el
+	// reintento (o la subida posterior desde el dispositivo) no la duplica.
+	const clientId = untrack(() => (song ? null : createId()));
 	let pendingChordDelete = $state<SongChordInput | null>(null);
 	let placementsNeedReview = $state(false);
 	let saving = $state(false);
@@ -163,11 +168,32 @@
 		pendingChordDelete = null;
 	}
 
+	async function saveOnDevice(
+		id: string,
+		payload: Omit<PendingSongInput, 'chords'> & { chords: SongChordInput[] }
+	) {
+		try {
+			const saved = await savePendingSong(id, {
+				...payload,
+				chords: prepareChords(payload.chords, createId)
+			});
+			onSaved(pendingToSong(saved));
+		} catch {
+			error = 'No se pudo guardar en el dispositivo';
+			saving = false;
+		}
+	}
+
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		if (saving) return;
 		if (chordProblems.some((problem) => problem !== null)) {
 			error = 'Corrige los acordes marcados antes de guardar';
+			return;
+		}
+
+		if (song && !connection.online) {
+			error = 'Sin conexión: los cambios necesitan internet';
 			return;
 		}
 
@@ -184,13 +210,25 @@
 			tagIds: selectedTagIds
 		};
 
+		if (clientId && !connection.online) {
+			await saveOnDevice(clientId, payload);
+			return;
+		}
+
 		try {
 			const saved = song
 				? await jsonRequest<Song>(`/api/songs/${song.id}`, 'PATCH', payload)
-				: await jsonRequest<Song>('/api/songs', 'POST', payload);
+				: await jsonRequest<Song>('/api/songs', 'POST', { ...payload, clientId });
 			// `saving` se queda en true: quien nos llama navega o cierra el formulario.
 			onSaved(saved);
 		} catch (requestError) {
+			// Sin respuesta del servidor, una canción nueva no se pierde: queda en el
+			// dispositivo y se sube sola al volver la conexión.
+			const unreachable = !(requestError instanceof ClientApiError) || requestError.status >= 500;
+			if (clientId && unreachable) {
+				await saveOnDevice(clientId, payload);
+				return;
+			}
 			error =
 				requestError instanceof ClientApiError
 					? requestError.message

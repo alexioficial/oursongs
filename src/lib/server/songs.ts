@@ -4,11 +4,13 @@ import { NotFoundError, ValidationError } from './errors';
 import { normalizeSongChordState } from './songChords';
 import { escapeRegex } from './text';
 import { resolveTagIds, toTagId } from './tags';
+import { isDuplicateKeyError } from './users';
 import {
 	ARTIST_MAX_LENGTH,
 	LYRICS_MAX_LENGTH,
 	RHYTHM_MAX_LENGTH,
-	TITLE_MAX_LENGTH
+	TITLE_MAX_LENGTH,
+	UUID_REGEX
 } from '$lib/validation';
 import type { ChordPlacement, Song, SongChord, SongInput, SongSummary } from '$lib/types';
 
@@ -27,6 +29,12 @@ export interface SongDoc {
 	/** Apariciones alineadas por offset con la letra. */
 	chordPlacements: ChordPlacement[];
 	tagIds: ObjectId[];
+	/**
+	 * Id que puso el cliente al crearla. Una canción creada sin conexión se sube
+	 * al volver la red, y si la respuesta se pierde por el camino el reintento
+	 * trae el mismo id: el índice único impide que se cree dos veces.
+	 */
+	clientId?: string;
 	createdBy: ObjectId;
 	createdAt: Date;
 	updatedBy?: ObjectId;
@@ -164,8 +172,17 @@ export async function getSong(id: string): Promise<Song | null> {
 	return doc ? toSong(doc) : null;
 }
 
+function normalizeClientId(clientId: unknown): string | undefined {
+	if (clientId === undefined || clientId === null) return undefined;
+	if (typeof clientId !== 'string' || !UUID_REGEX.test(clientId)) {
+		throw new ValidationError('El identificador de la canción no es válido');
+	}
+	return clientId.toLowerCase();
+}
+
 export async function createSong(input: SongInput, userId: ObjectId): Promise<Song> {
 	const now = new Date();
+	const clientId = normalizeClientId(input.clientId);
 	const artist = normalizeArtist(input.artist);
 	const rhythm = normalizeRhythm(input.rhythm);
 	const lyrics = normalizeLyrics(input.lyrics);
@@ -182,14 +199,57 @@ export async function createSong(input: SongInput, userId: ObjectId): Promise<So
 		chords,
 		chordPlacements,
 		tagIds: await resolveTagIds(input.tagIds),
+		...(clientId && { clientId }),
 		createdBy: userId,
 		createdAt: now,
 		updatedAt: now
 	} as SongDoc;
 
 	const db: Db = await getDb();
-	const result = await db.collection<SongDoc>(SONGS_COLLECTION).insertOne(doc);
-	return toSong({ ...doc, _id: result.insertedId });
+	const songs = db.collection<SongDoc>(SONGS_COLLECTION);
+	try {
+		const result = await songs.insertOne(doc);
+		return toSong({ ...doc, _id: result.insertedId });
+	} catch (error) {
+		// Ya se creó en un intento anterior: se devuelve esa, no un error.
+		if (clientId && isDuplicateKeyError(error)) {
+			const existing = await songs.findOne({ clientId });
+			if (existing) return toSong(existing);
+		}
+		throw error;
+	}
+}
+
+export interface SongPage {
+	songs: Song[];
+	total: number;
+	/** Cursor para la página siguiente; null en la última. */
+	next: string | null;
+}
+
+/**
+ * El repertorio entero, completo y por páginas, para la copia sin conexión. Va
+ * por `_id` y no por fecha: un cursor sobre un campo que cambia al editar
+ * saltaría o repetiría canciones mientras se descarga.
+ */
+export async function listSongPage(after: string | null, limit: number): Promise<SongPage> {
+	const db: Db = await getDb();
+	const songs = db.collection<SongDoc>(SONGS_COLLECTION);
+	const filter: Filter<SongDoc> = after ? { _id: { $gt: toSongId(after) } } : {};
+	const [docs, total] = await Promise.all([
+		songs
+			.find(filter)
+			.sort({ _id: 1 })
+			.limit(limit + 1)
+			.toArray(),
+		songs.countDocuments()
+	]);
+	const page = docs.slice(0, limit);
+	return {
+		songs: page.map(toSong),
+		total,
+		next: docs.length > limit ? page[page.length - 1]._id.toString() : null
+	};
 }
 
 /**

@@ -60,7 +60,14 @@ async function ensureIndexes(database: Db) {
 
 		ensureIndex(database, 'songs', { updatedAt: -1 }),
 		ensureIndex(database, 'songs', { title: 1 }),
-		ensureIndex(database, 'songs', { tagIds: 1 })
+		ensureIndex(database, 'songs', { tagIds: 1 }),
+		// Solo las canciones creadas con id de cliente: el resto no lo tiene.
+		ensureIndex(
+			database,
+			'songs',
+			{ clientId: 1 },
+			{ unique: true, partialFilterExpression: { clientId: { $type: 'string' } } }
+		)
 	]);
 }
 
