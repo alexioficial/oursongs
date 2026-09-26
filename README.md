@@ -52,6 +52,9 @@ bun run create:user pepe --password "…" --reset       # cambia la contraseña 
 `prompt` hace eco de lo que se escribe; para no dejar la contraseña en el
 historial de la terminal puedes pasarla por `OURSONGS_PASSWORD`.
 
+El detalle está en [`USUARIOS.md`](USUARIOS.md): reglas de usuario y contraseña,
+cambio de contraseña, alta desde el terminal de Coolify y baja de una cuenta.
+
 ## Las dos pantallas
 
 - **Canciones** (`/canciones`) — lista con buscador por título/artista y filtro
@@ -59,7 +62,8 @@ historial de la terminal puedes pasarla por `OURSONGS_PASSWORD`.
   aquí se registra una canción nueva.
   - **Ficha** (`/canciones/[id]`) — acordes alineados sobre la letra, transposición,
     edición y borrado. La pantalla `/canciones/[id]/alinear` permite colocar cada
-    aparición de un acorde en la posición exacta de la letra.
+    aparición de un acorde en la posición exacta de la letra arrastrándolo, con una
+    vista previa de cómo queda (en táctil, tras mantenerlo pulsado).
 - **Tags** (`/tags`) — crear, renombrar y borrar tags, y asignar un tag a varias
   canciones de golpe. Borrar un tag lo quita de sus canciones; las canciones no
   se tocan.
@@ -166,7 +170,8 @@ solo pide reiniciar, no reconstruir.
   consultar Mongo — mide si el proceso sirve, que es lo que debería decidir un
   reinicio.
 - **Primer usuario**: desde el terminal del contenedor,
-  `bun run create:user tuusuario --password "…"`. La imagen lleva el script y los
-  tres módulos que necesita.
+  `bun run create:user tuusuario --password "…"` (paso a paso en
+  [`USUARIOS.md`](USUARIOS.md)). La imagen lleva el script y los tres módulos que
+  necesita.
 - `ORIGIN` con `https://` importa: Traefik termina el TLS y sin ella adapter-node
   compone mal las URLs detrás del proxy.

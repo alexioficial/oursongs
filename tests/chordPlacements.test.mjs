@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import {
+	dropPlacement,
 	lineVisualWidth,
 	movePlacement,
+	offsetAtColumn,
 	packChordRows,
 	placementOffsets,
 	placementsForLine,
@@ -135,5 +137,47 @@ describe('posiciones visuales', () => {
 	test('el ancho visual incluye texto y acordes que sobresalen', () => {
 		expect(lineVisualWidth('', [{ chordId: 'a', offset: 0, column: 0, label: 'Cmaj7' }])).toBe(5);
 		expect(lineVisualWidth('a🎵b', [])).toBe(3);
+	});
+
+	test('traduce una columna de la línea a un offset global sin partir grafemas', () => {
+		const [, line] = splitLyricLines('uno\na🎵b');
+		expect(offsetAtColumn(line, 0)).toBe(4);
+		expect(offsetAtColumn(line, 1)).toBe(5);
+		expect(offsetAtColumn(line, 2)).toBe(7);
+		expect(offsetAtColumn(line, 3)).toBe(8);
+	});
+
+	test('una columna fuera de la línea cae en su principio o su final', () => {
+		const [line] = splitLyricLines('ab');
+		expect(offsetAtColumn(line, -3)).toBe(0);
+		expect(offsetAtColumn(line, 40)).toBe(2);
+		expect(offsetAtColumn(splitLyricLines('')[0], 5)).toBe(0);
+	});
+
+	test('soltar un acorde nuevo lo añade en orden', () => {
+		expect(dropPlacement([{ chordId: 'a', offset: 4 }], 'b', null, 1)).toEqual([
+			{ chordId: 'b', offset: 1 },
+			{ chordId: 'a', offset: 4 }
+		]);
+	});
+
+	test('soltar un acorde colocado lo mueve en vez de duplicarlo', () => {
+		const placements = [
+			{ chordId: 'a', offset: 0 },
+			{ chordId: 'b', offset: 3 }
+		];
+		expect(dropPlacement(placements, 'a', 0, 5)).toEqual([
+			{ chordId: 'b', offset: 3 },
+			{ chordId: 'a', offset: 5 }
+		]);
+		expect(placements).toHaveLength(2);
+	});
+
+	test('soltar sobre otra aparición la reemplaza', () => {
+		const placements = [
+			{ chordId: 'a', offset: 0 },
+			{ chordId: 'b', offset: 3 }
+		];
+		expect(dropPlacement(placements, 'a', 0, 3)).toEqual([{ chordId: 'a', offset: 3 }]);
 	});
 });

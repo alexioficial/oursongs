@@ -25,8 +25,9 @@
 <PageHeader title="Alinear acordes" subtitle={data.song.title} />
 
 <p class="intro muted">
-	Pulsa una posición de la letra y luego el acorde que entra ahí. Puedes reutilizar cada acorde
-	cuantas veces necesites.
+	Arrastra un acorde hasta su sitio en la letra; mientras lo arrastras verás cómo queda. En el
+	móvil, mantén pulsado el acorde un instante antes de arrastrarlo. También puedes tocar una
+	posición y luego el acorde. Cada acorde se puede usar cuantas veces necesites.
 </p>
 
 <ChordAlignmentEditor song={data.song} onSaved={saved} onCancel={close} />

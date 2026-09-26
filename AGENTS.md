@@ -314,6 +314,9 @@ contenedor:
 bun run create:user pepe --password "una contraseña larga"   # --reset para cambiarla
 ```
 
+`USUARIOS.md` documenta el alta de cuentas de cara al operador (reglas, errores,
+baja). Si cambias el script, actualízalo.
+
 Si cambian los imports del script, esa lista de `COPY` hay que actualizarla o el
 comando falla **solo en producción**.
 

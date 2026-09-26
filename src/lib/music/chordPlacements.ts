@@ -100,6 +100,33 @@ export function upsertPlacement(
 	);
 }
 
+/**
+ * Resultado de soltar un acorde arrastrado: `from` es null si viene de la paleta.
+ * Lo usa también la vista previa, así que lo que se ve al arrastrar es
+ * exactamente lo que queda al soltar.
+ */
+export function dropPlacement(
+	placements: ChordPlacement[],
+	chordId: string,
+	from: number | null,
+	to: number
+): ChordPlacement[] {
+	const rest = from === null ? placements : placements.filter(({ offset }) => offset !== from);
+	return upsertPlacement(rest, { chordId, offset: to });
+}
+
+/**
+ * Offset global del hueco que hay antes de la columna indicada de una línea. Las
+ * columnas son grafemas (la rejilla del editor mide 1ch por grafema), y lo que
+ * cae fuera se lleva al principio o al final de la línea.
+ */
+export function offsetAtColumn(line: LyricLine, column: number): number {
+	const graphemes = splitGraphemes(line.text);
+	if (column <= 0) return line.start;
+	if (column >= graphemes.length) return line.end;
+	return line.start + graphemes[column].offset;
+}
+
 export function removePlacementsForChord(
 	placements: ChordPlacement[],
 	chordId: string
