@@ -50,6 +50,8 @@
 	const LONG_PRESS_MS = 220;
 	const TOUCH_SLOP_PX = 8;
 	const MOUSE_THRESHOLD_PX = 4;
+	/** En la columna lateral, un acorde más largo que esto ocupa las dos columnas. */
+	const WIDE_CHORD_LENGTH = 5;
 	const AUTOSCROLL_EDGE_PX = 72;
 	const AUTOSCROLL_MAX_SPEED = 18;
 
@@ -83,28 +85,15 @@
 			? dropPlacement(placements, drag.chordId, drag.from, drag.target)
 			: placements
 	);
-	// Mientras se arrastra, cada línea conserva las filas de acordes que tenía al
-	// empezar: si la de origen se encogiera al sacar su acorde, todo lo de debajo
-	// subiría bajo el puntero y el destino se pondría a saltar.
+	// La letra no puede cambiar de alto bajo el puntero mientras se arrastra, o el
+	// destino salta de línea. Por eso cada línea tiene siempre al menos una fila de
+	// acordes (colocar el primero no la hace crecer) y, durante el arrastre,
+	// conserva las que tenía al empezar (sacar su acorde no la encoge).
 	const reservedRows = $derived(
-		drag
-			? lines.map((line) => packChordRows(placementsForLine(line, placements, chordById)).length)
-			: null
+		lines.map((line) =>
+			drag ? Math.max(1, packChordRows(placementsForLine(line, placements, chordById)).length) : 1
+		)
 	);
-	const status = $derived.by(() => {
-		if (!drag) return `Posición ${selectedOffset}`;
-		if (drag.target === null) {
-			return drag.from === null
-				? `Arrastra ${drag.label} hasta la letra`
-				: `Suelta fuera de la letra para dejar ${drag.label} donde estaba`;
-		}
-		const target = drag.target;
-		const replaced = placements.find(({ offset }) => offset === target && offset !== drag?.from);
-		const replacedLabel = replaced && chordById.get(replaced.chordId);
-		return replacedLabel
-			? `Soltar ${drag.label} aquí reemplaza ${replacedLabel}`
-			: `Soltar ${drag.label} en la posición ${target}`;
-	});
 
 	/**
 	 * Al arrastrar, el acorde de origen puede desaparecer del DOM (la vista previa
@@ -305,7 +294,11 @@
 		// Hasta que el acorde no entra en la letra no hay scroll: si no, al sacar un
 		// acorde de la paleta la página saldría disparada hacia arriba.
 		if (!enteredEditor) return;
-		const top = Math.max(0, paletteEl?.getBoundingClientRect().bottom ?? 0);
+		// La paleta solo tapa la letra cuando va encima (móvil); en escritorio va al lado.
+		const palette = paletteEl?.getBoundingClientRect();
+		const editor = editorEl?.getBoundingClientRect();
+		const paletteAbove = palette && editor && palette.right > editor.left;
+		const top = paletteAbove ? Math.max(0, palette.bottom) : 0;
 		const bottom = window.innerHeight;
 		if (y > top && y < top + AUTOSCROLL_EDGE_PX) {
 			window.scrollBy(0, -edgeSpeed(top + AUTOSCROLL_EDGE_PX - y));
@@ -371,6 +364,7 @@
 					<button
 						type="button"
 						class="chip mono draggable"
+						class:wide={chord.value.length > WIDE_CHORD_LENGTH}
 						class:source={drag?.from === null && drag.chordId === chord.id}
 						aria-pressed={selectedPlacement?.chordId === chord.id}
 						disabled={saving}
@@ -384,98 +378,98 @@
 			</div>
 		</section>
 
-		<div class="status muted mono" aria-live="polite">{status}</div>
-
-		<div class="lyrics-editor" aria-label="Letra para alinear" bind:this={editorEl}>
-			{#each lines as line, lineIndex (line.start)}
-				{@const graphemes = splitGraphemes(line.text)}
-				{@const positioned = placementsForLine(line, preview, chordById)}
-				{@const rows = packChordRows(positioned)}
-				{@const columns = Math.max(
-					graphemes.length + 1,
-					...positioned.map((chord) => chord.column + chord.label.length)
-				)}
-				<div class="line-scroll" data-line={lineIndex}>
-					<div
-						class="line-grid"
-						data-columns={columns}
-						style={`--columns: ${columns}; min-width: ${columns}ch`}
-					>
-						{#each rows as row, rowIndex (rowIndex)}
-							<div class="chord-row">
-								{#each row as chord (`${chord.offset}-${chord.chordId}`)}
-									{@const ghost = drag !== null && drag.target === chord.offset}
+		<div class="workspace">
+			<div class="lyrics-editor" aria-label="Letra para alinear" bind:this={editorEl}>
+				{#each lines as line, lineIndex (line.start)}
+					{@const graphemes = splitGraphemes(line.text)}
+					{@const positioned = placementsForLine(line, preview, chordById)}
+					{@const rows = packChordRows(positioned)}
+					{@const columns = Math.max(
+						graphemes.length + 1,
+						...positioned.map((chord) => chord.column + chord.label.length)
+					)}
+					<div class="line-scroll" data-line={lineIndex}>
+						<div
+							class="line-grid"
+							data-columns={columns}
+							style={`--columns: ${columns}; min-width: ${columns}ch`}
+						>
+							{#each rows as row, rowIndex (rowIndex)}
+								<div class="chord-row">
+									{#each row as chord (`${chord.offset}-${chord.chordId}`)}
+										{@const ghost = drag !== null && drag.target === chord.offset}
+										<button
+											type="button"
+											class="placed-chord mono draggable"
+											class:selected={!drag && selectedOffset === chord.offset}
+											class:ghost
+											class:source={drag?.target === null && drag.from === chord.offset}
+											style={`grid-column: ${chord.column + 1} / span ${Math.max(1, chord.label.length)}`}
+											data-placement={chord.offset}
+											aria-label={`${chord.label}. Flechas para mover, Suprimir para quitar`}
+											disabled={saving}
+											onclick={() => selectOffset(chord.offset)}
+											onkeydown={(event) => onPlacedKeydown(event, chord.offset)}
+											onpointerdown={(event) =>
+												startGesture(event, chord.chordId, chord.label, chord.offset)}
+											{@attach blockTouchScroll}
+										>
+											{chord.label}
+										</button>
+									{/each}
+								</div>
+							{/each}
+							{#each { length: Math.max(0, reservedRows[lineIndex] - rows.length) }, index (index)}
+								<div class="chord-row" aria-hidden="true">
+									<span class="placed-chord mono spacer">&nbsp;</span>
+								</div>
+							{/each}
+							<div class="text-row mono">
+								{#each graphemes as grapheme, index (grapheme.offset)}
+									{@const offset = line.start + grapheme.offset}
 									<button
 										type="button"
-										class="placed-chord mono draggable"
-										class:selected={!drag && selectedOffset === chord.offset}
-										class:ghost
-										class:source={drag?.target === null && drag.from === chord.offset}
-										style={`grid-column: ${chord.column + 1} / span ${Math.max(1, chord.label.length)}`}
-										data-placement={chord.offset}
-										aria-label={`${chord.label}. Flechas para mover, Suprimir para quitar`}
+										class="character"
+										class:selected={!drag && selectedOffset === offset}
+										class:drop-target={drag?.target === offset}
+										style={`grid-column: ${index + 1}`}
+										tabindex="-1"
+										aria-label={`Colocar antes de ${grapheme.text === ' ' ? 'un espacio' : grapheme.text}`}
 										disabled={saving}
-										onclick={() => selectOffset(chord.offset)}
-										onkeydown={(event) => onPlacedKeydown(event, chord.offset)}
-										onpointerdown={(event) =>
-											startGesture(event, chord.chordId, chord.label, chord.offset)}
-										{@attach blockTouchScroll}
+										onclick={() => selectOffset(offset)}
 									>
-										{chord.label}
+										{grapheme.text === ' ' ? ' ' : grapheme.text}
 									</button>
 								{/each}
-							</div>
-						{/each}
-						{#each { length: Math.max(0, (reservedRows?.[lineIndex] ?? 0) - rows.length) }, index (index)}
-							<div class="chord-row" aria-hidden="true">
-								<span class="placed-chord mono spacer">&nbsp;</span>
-							</div>
-						{/each}
-						<div class="text-row mono">
-							{#each graphemes as grapheme, index (grapheme.offset)}
-								{@const offset = line.start + grapheme.offset}
 								<button
 									type="button"
-									class="character"
-									class:selected={!drag && selectedOffset === offset}
-									class:drop-target={drag?.target === offset}
-									style={`grid-column: ${index + 1}`}
+									class="character end"
+									class:selected={!drag && selectedOffset === line.end}
+									class:drop-target={drag?.target === line.end}
+									style={`grid-column: ${graphemes.length + 1}`}
 									tabindex="-1"
-									aria-label={`Colocar antes de ${grapheme.text === ' ' ? 'un espacio' : grapheme.text}`}
+									aria-label="Colocar al final de la línea"
 									disabled={saving}
-									onclick={() => selectOffset(offset)}
+									onclick={() => selectOffset(line.end)}
 								>
-									{grapheme.text === ' ' ? ' ' : grapheme.text}
+									&nbsp;
 								</button>
-							{/each}
-							<button
-								type="button"
-								class="character end"
-								class:selected={!drag && selectedOffset === line.end}
-								class:drop-target={drag?.target === line.end}
-								style={`grid-column: ${graphemes.length + 1}`}
-								tabindex="-1"
-								aria-label="Colocar al final de la línea"
-								disabled={saving}
-								onclick={() => selectOffset(line.end)}
-							>
-								&nbsp;
-							</button>
+							</div>
 						</div>
 					</div>
-				</div>
-			{/each}
-		</div>
+				{/each}
+			</div>
 
-		{#if error}<p class="error-text">{error}</p>{/if}
+			{#if error}<p class="error-text">{error}</p>{/if}
 
-		<div class="save-actions">
-			<button type="button" class="btn btn-subtle" disabled={saving} onclick={onCancel}>
-				Cancelar
-			</button>
-			<button type="button" class="btn btn-primary" disabled={saving} onclick={save}>
-				{#if saving}Guardando…{:else}<Icon name="check" size={16} /> Guardar alineación{/if}
-			</button>
+			<div class="save-actions">
+				<button type="button" class="btn btn-subtle" disabled={saving} onclick={onCancel}>
+					Cancelar
+				</button>
+				<button type="button" class="btn btn-primary" disabled={saving} onclick={save}>
+					{#if saving}Guardando…{:else}<Icon name="check" size={16} /> Guardar alineación{/if}
+				</button>
+			</div>
 		</div>
 	</div>
 
@@ -547,12 +541,9 @@
 		border-style: dashed;
 		opacity: 0.55;
 	}
-	.status {
-		font-size: 0.78rem;
-	}
 	.lyrics-editor {
 		display: grid;
-		gap: 0.875rem;
+		gap: 0.375rem;
 		padding: 1rem;
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-overlay);
@@ -661,9 +652,55 @@
 	.missing p {
 		margin: 0;
 	}
+	.workspace {
+		display: grid;
+		gap: 1rem;
+		min-width: 0;
+	}
+	/* En escritorio la paleta pasa a una columna lateral fija, a la izquierda de la letra. */
 	@media (min-width: 960px) {
+		.alignment-editor {
+			--palette-width: 11rem;
+			--palette-gap: 1.25rem;
+			grid-template-columns: var(--palette-width) minmax(0, 1fr);
+			gap: var(--palette-gap);
+			align-items: start;
+		}
 		.palette-wrap {
 			top: 1rem;
+			max-height: calc(100dvh - 2rem);
+			overflow-y: auto;
+		}
+		.palette {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			grid-auto-flow: row dense;
+		}
+		.palette .chip {
+			justify-content: center;
+			min-width: 0;
+			overflow-wrap: anywhere;
+		}
+		.chip.remove,
+		.chip.wide,
+		.palette-divider {
+			grid-column: 1 / -1;
+		}
+		.palette-divider {
+			width: auto;
+			height: 1px;
+			margin: 0.125rem 0;
+		}
+	}
+	/*
+	 * Con la pantalla lo bastante ancha, la paleta sale al margen que deja la
+	 * columna de contenido (64rem, ver +layout.svelte) y la letra conserva todo su
+	 * ancho. 95rem = rail (13rem) + contenido (64rem) + dos veces lo que ocupa la
+	 * paleta menos el padding del contenido.
+	 */
+	@media (min-width: 95rem) {
+		.alignment-editor {
+			margin-left: calc(-1 * (var(--palette-width) + var(--palette-gap)));
 		}
 	}
 	@media (max-width: 560px) {
