@@ -5,6 +5,14 @@ import { MAX_CHORDS_PER_SONG, MAX_CHORD_PLACEMENTS_PER_SONG } from '../validatio
 import type { ChordPlacement, SongChord, SongChordInput } from '../types';
 import { ValidationError } from './errors';
 
+/**
+ * Un acorde nuevo puede traer su id desde el cliente cuando hace falta
+ * referirse a él antes de guardarlo: al importar una letra con acordes, las
+ * apariciones apuntan a acordes que todavía no existen. Solo se acepta con
+ * formato de UUID, que es lo que genera el propio servidor.
+ */
+const CLIENT_CHORD_ID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -31,7 +39,8 @@ export function normalizeChordCatalog(
 		if (input.id === undefined) {
 			id = createId();
 		} else {
-			if (typeof input.id !== 'string' || !currentIds.has(input.id)) {
+			const known = typeof input.id === 'string' && currentIds.has(input.id);
+			if (typeof input.id !== 'string' || (!known && !CLIENT_CHORD_ID_REGEX.test(input.id))) {
 				throw new ValidationError('El acorde indicado ya no existe');
 			}
 			id = input.id;

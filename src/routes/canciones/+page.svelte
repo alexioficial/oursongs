@@ -137,7 +137,11 @@
 				<a class="card card-hover song" href={resolve('/canciones/[id]', { id: song.id })}>
 					<div class="song-main">
 						<h2 class="song-title">{song.title}</h2>
-						{#if song.artist}<p class="song-artist muted">{song.artist}</p>{/if}
+						{#if song.artist || song.rhythm}
+							<p class="song-artist muted">
+								{[song.artist, song.rhythm].filter(Boolean).join(' · ')}
+							</p>
+						{/if}
 						{#if song.tagIds.length > 0}
 							<div class="song-tags">
 								{#each song.tagIds as tagId (tagId)}
@@ -191,6 +195,10 @@
 	}
 	.search-input::-webkit-search-cancel-button {
 		filter: invert(1) opacity(0.5);
+	}
+	/* La X nativa ya es oscura en el tema claro: invertirla la dejaría blanca. */
+	:global(:root[data-theme='light']) .search-input::-webkit-search-cancel-button {
+		filter: opacity(0.5);
 	}
 	.tag-filter {
 		display: flex;

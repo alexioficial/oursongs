@@ -129,9 +129,12 @@ src/
   hooks.server.ts            sesión → cabeceras de seguridad → guard (en ese orden)
   lib/
     music/chords.ts          transposición; puro, sin dependencias, con tests
+    music/chordPlacements.ts posiciones de acordes sobre la letra (grafemas)
+    music/chordSheet.ts      importar letras con acordes encima o ChordPro
     validation.ts            límites compartidos (cliente + servidor + scripts)
     types.ts                 DTOs que cruzan al cliente
     client/json.ts           fetch + traducción de `{ error }` a excepción
+    client/ids.ts            UUID en el navegador (también sin https)
     components/              Icon, Nav, PageHeader, EmptyState, Modal,
                              ConfirmDialog, SongForm, TagPicker, ChordLyrics,
                              ChordCatalogEditor, ChordAlignmentEditor
@@ -148,7 +151,7 @@ src/
     canciones/  tags/  login/
     api/                     solo escritura (POST/PATCH/PUT/DELETE)
 scripts/createUser.ts        alta de usuarios (fuera de SvelteKit)
-tests/chords.test.mjs        bun:test importando el .ts directamente
+tests/*.test.mjs             bun:test importando el .ts directamente
 ```
 
 ---
@@ -165,12 +168,12 @@ privacidad, hay que añadir filtros en todas las consultas de `songs.ts` y
 
 ### 5.2. Colecciones e invariantes
 
-| Colección  | Campos                                                                                                 |
-| ---------- | ------------------------------------------------------------------------------------------------------ |
-| `users`    | `username` (único, insensible a mayúsculas), `passwordHash` (scrypt), `name?`                          |
-| `sessions` | `tokenHash` (SHA-256 del token de la cookie), `userId`, `expiresAt` (índice TTL)                       |
-| `songs`    | `title`, `artist?`, `lyrics`, `chords` (`{id,value}[]`), `chordPlacements`, `tagIds`, autoría y fechas |
-| `tags`     | `name` (único, insensible a mayúsculas), `slug` (único)                                                |
+| Colección  | Campos                                                                                                            |
+| ---------- | ----------------------------------------------------------------------------------------------------------------- |
+| `users`    | `username` (único, insensible a mayúsculas), `passwordHash` (scrypt), `name?`                                     |
+| `sessions` | `tokenHash` (SHA-256 del token de la cookie), `userId`, `expiresAt` (índice TTL)                                  |
+| `songs`    | `title`, `artist?`, `rhythm?`, `lyrics`, `chords` (`{id,value}[]`), `chordPlacements`, `tagIds`, autoría y fechas |
+| `tags`     | `name` (único, insensible a mayúsculas), `slug` (único)                                                           |
 
 Índices en `ensureIndexes` de `db.ts`; se crean al arrancar y `ensureIndex`
 recrea el índice si choca por opciones (códigos 85/86). Sesiones: 30 días, y
@@ -188,6 +191,15 @@ Invariantes que hay que mantener:
 - **Cada `chordPlacement` referencia un acorde existente** y usa un offset válido
   de la letra. Solo puede haber un acorde en cada posición. Al editar la letra,
   `SongForm` reajusta las posiciones y pide revisión si el cambio atraviesa una.
+- **El id de un acorde lo pone el servidor o el cliente como UUID.** Un acorde
+  nuevo sin id recibe uno al guardar; con id desconocido solo se acepta si es un
+  UUID, porque al importar una letra pegada las posiciones tienen que apuntar a
+  acordes que todavía no se han guardado.
+- **El servidor no recorta la letra** (solo pasa CRLF a LF). Una línea de solo
+  acordes, como una intro o un final, se guarda como una línea de espacios, y un
+  `trim()` se la llevaría con sus acordes y descuadraría todos los offsets. Los
+  extremos los recorta `SongForm` con `trimLyrics`, que sabe dónde hay acordes. No
+  vuelvas a poner `trim()` en `normalizeLyrics`.
 - **`updatedAt` siempre existe** (en el alta vale lo mismo que `createdAt`),
   porque la lista ordena por él.
 - Los nombres únicos los decide el **índice**, no un `findOne` previo: así dos
@@ -223,7 +235,7 @@ normalizador (`normalizeTitle`, `normalizeChordCatalog`…) decide. Los límites
 `src/lib/validation.ts` y los usan también los formularios, para que el cliente
 avise de lo mismo que rechaza el servidor:
 
-`username` 3-20 caracteres · contraseña 8-200 · nombre 60 · título y artista 120 ·
+`username` 3-20 caracteres · contraseña 8-200 · nombre 60 · título y artista 120 · ritmo 60 (texto libre) ·
 letra 20 000 · nombre de tag 40 · 200 acordes por canción · cuerpo JSON 64 KB.
 
 Errores: lanza `ValidationError` (400), `ConflictError` (409) o `NotFoundError`
@@ -288,6 +300,14 @@ y las clases (`.btn`, `.btn-primary`, `.btn-danger`, `.input`, `.card`, `.chip`,
 esas clases y **no introduzcas colores**: lo destructivo se marca con borde claro
 y texto en blanco, no en rojo. El resto de estilos van en el `<style>` del
 componente, con variables `var(--color-…)`.
+
+Hay tema claro y oscuro: `layout.css` redefine los tokens bajo
+`:root[data-theme='light']`. El tema vive en la cookie `theme` (`src/lib/theme.ts`)
+y `hooks.server.ts` lo escribe en el `<html>` al renderizar, para que la página no
+parpadee. Por eso **nada de colores fijos** (`#fff`, `#111`…) para fondos, textos
+o bordes en los componentes: se verían bien en un tema y mal en el otro (las
+sombras negras sí valen en los dos). Si hace falta un color nuevo, es un token más
+en los dos bloques, como `--color-backdrop`.
 
 Los iconos son un mapa estático en `Icon.svelte` (trazo, `currentColor`, sin
 dependencias). Para uno nuevo, añade la entrada al mapa.

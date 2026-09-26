@@ -64,6 +64,10 @@ cambio de contraseña, alta desde el terminal de Coolify y baja de una cuenta.
     edición y borrado. La pantalla `/canciones/[id]/alinear` permite colocar cada
     aparición de un acorde en la posición exacta de la letra arrastrándolo, con una
     vista previa de cómo queda (en táctil, tras mantenerlo pulsado).
+  - **Pegar una letra con acordes**: si lo que se pega en la letra trae los
+    acordes encima (como en cualquier cancionero) o en formato ChordPro
+    (`[C]Hola`), se separan solos: la letra va al texto y cada acorde al catálogo y
+    a su sílaba. Si se detectó por error, "Pegar como texto" lo deshace.
 - **Tags** (`/tags`) — crear, renombrar y borrar tags, y asignar un tag a varias
   canciones de golpe. Borrar un tag lo quita de sus canciones; las canciones no
   se tocan.
@@ -137,7 +141,7 @@ que llega: cada campo entra como `unknown` y sale normalizado o con un 400.
   (scrypt de `node:crypto`), `name?`.
 - **sessions** — solo el `tokenHash` (SHA-256 del token de la cookie), con índice
   TTL para que Mongo limpie las vencidas.
-- **songs** — `title`, `artist?`, `lyrics`, catálogo `chords`, posiciones
+- **songs** — `title`, `artist?`, `rhythm?` (texto libre: "4/4", "merengue"…), `lyrics`, catálogo `chords`, posiciones
   `chordPlacements`, `tagIds`, `createdBy`/`createdAt`, `updatedBy`/`updatedAt`.
 - **tags** — `name` (único sin importar mayúsculas), `slug`.
 

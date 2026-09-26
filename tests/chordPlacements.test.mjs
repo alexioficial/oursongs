@@ -9,8 +9,10 @@ import {
 	placementsForLine,
 	remapPlacements,
 	removePlacementsForChord,
+	splicePlacements,
 	splitGraphemes,
 	splitLyricLines,
+	trimLyrics,
 	upsertPlacement
 } from '../src/lib/music/chordPlacements.ts';
 
@@ -179,5 +181,75 @@ describe('posiciones visuales', () => {
 			{ chordId: 'b', offset: 3 }
 		];
 		expect(dropPlacement(placements, 'a', 0, 3)).toEqual([{ chordId: 'a', offset: 3 }]);
+	});
+});
+
+describe('recorte de la letra al guardar', () => {
+	test('quita espacios y saltos de los extremos y desplaza los acordes', () => {
+		expect(trimLyrics('\n\n  hola mundo \n\n', [{ chordId: 'a', offset: 7 }])).toEqual({
+			lyrics: 'hola mundo',
+			placements: [{ chordId: 'a', offset: 3 }]
+		});
+	});
+
+	test('conserva una línea de solo acordes al principio', () => {
+		expect(trimLyrics('\n    \nhola', [{ chordId: 'a', offset: 1 }])).toEqual({
+			lyrics: '    \nhola',
+			placements: [{ chordId: 'a', offset: 0 }]
+		});
+	});
+
+	test('conserva una línea de solo acordes al final', () => {
+		expect(trimLyrics('hola\n     \n\n', [{ chordId: 'a', offset: 9 }])).toEqual({
+			lyrics: 'hola\n    ',
+			placements: [{ chordId: 'a', offset: 9 }]
+		});
+	});
+
+	test('una letra en blanco sin acordes queda vacía', () => {
+		expect(trimLyrics('  \n \n', [])).toEqual({ lyrics: '', placements: [] });
+	});
+});
+
+describe('pegar en medio de la letra', () => {
+	test('desplaza lo que queda detrás de lo pegado', () => {
+		expect(
+			splicePlacements(
+				[
+					{ chordId: 'a', offset: 0 },
+					{ chordId: 'b', offset: 4 }
+				],
+				4,
+				4,
+				6
+			)
+		).toEqual({
+			placements: [
+				{ chordId: 'a', offset: 0 },
+				{ chordId: 'b', offset: 10 }
+			],
+			dropped: false
+		});
+	});
+
+	test('quita los acordes de la selección reemplazada', () => {
+		expect(
+			splicePlacements(
+				[
+					{ chordId: 'a', offset: 1 },
+					{ chordId: 'b', offset: 3 },
+					{ chordId: 'c', offset: 5 }
+				],
+				1,
+				4,
+				2
+			)
+		).toEqual({
+			placements: [
+				{ chordId: 'a', offset: 1 },
+				{ chordId: 'c', offset: 4 }
+			],
+			dropped: true
+		});
 	});
 });

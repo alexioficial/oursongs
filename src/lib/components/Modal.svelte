@@ -45,6 +45,8 @@
 
 <style>
 	.modal {
+		/* El reset de Tailwind quita el `margin: auto` con el que el navegador centra el <dialog>. */
+		margin: auto;
 		width: min(42rem, calc(100vw - 2rem));
 		max-width: none;
 		max-height: calc(100dvh - 2rem);
@@ -54,7 +56,7 @@
 		color: var(--color-text);
 	}
 	.modal::backdrop {
-		background: rgba(0, 0, 0, 0.72);
+		background: var(--color-backdrop);
 		backdrop-filter: blur(3px);
 	}
 	.modal-card {

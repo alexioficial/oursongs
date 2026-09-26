@@ -1,13 +1,27 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import ChordCatalogEditor from './ChordCatalogEditor.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import Icon from './Icon.svelte';
 	import TagPicker from './TagPicker.svelte';
+	import { createId } from '$lib/client/ids';
 	import { ClientApiError, jsonRequest } from '$lib/client/json';
 	import { chordCatalogProblems } from '$lib/music/chordCatalog';
-	import { remapPlacements, removePlacementsForChord } from '$lib/music/chordPlacements';
-	import { ARTIST_MAX_LENGTH, LYRICS_MAX_LENGTH, TITLE_MAX_LENGTH } from '$lib/validation';
+	import {
+		remapPlacements,
+		removePlacementsForChord,
+		splicePlacements,
+		trimLyrics
+	} from '$lib/music/chordPlacements';
+	import { applyChordSheet, parseChordSheet } from '$lib/music/chordSheet';
+	import {
+		ARTIST_MAX_LENGTH,
+		LYRICS_MAX_LENGTH,
+		MAX_CHORD_PLACEMENTS_PER_SONG,
+		MAX_CHORDS_PER_SONG,
+		RHYTHM_MAX_LENGTH,
+		TITLE_MAX_LENGTH
+	} from '$lib/validation';
 	import type { ChordPlacement, Song, SongChordInput, Tag } from '$lib/types';
 
 	interface Props {
@@ -23,6 +37,7 @@
 	// `untrack` deja claro que solo interesa el valor inicial.
 	let title = $state(untrack(() => song?.title ?? ''));
 	let artist = $state(untrack(() => song?.artist ?? ''));
+	let rhythm = $state(untrack(() => song?.rhythm ?? ''));
 	let chords = $state<SongChordInput[]>(
 		untrack(() => song?.chords.map((chord) => ({ ...chord })) ?? [])
 	);
@@ -36,6 +51,34 @@
 	let saving = $state(false);
 	let error = $state<string | null>(null);
 
+	let lyricsInput = $state<HTMLTextAreaElement>();
+
+	/**
+	 * Lo último que se importó al pegar, con lo que había antes: permite
+	 * deshacerlo y pegar el texto tal cual si la detección se equivocó.
+	 */
+	interface PastedImport {
+		raw: string;
+		start: number;
+		end: number;
+		placed: number;
+		added: number;
+		before: {
+			lyrics: string;
+			chords: SongChordInput[];
+			chordPlacements: ChordPlacement[];
+			placementsNeedReview: boolean;
+		};
+	}
+	let pastedImport = $state<PastedImport | null>(null);
+	const importSummary = $derived.by(() => {
+		if (!pastedImport) return '';
+		const { placed, added } = pastedImport;
+		const placedText = `Se ${placed === 1 ? 'colocó 1 acorde' : `colocaron ${placed} acordes`} sobre la letra`;
+		if (added === 0) return `${placedText}.`;
+		return `${placedText} y ${added === 1 ? 'se añadió 1' : `se añadieron ${added}`} al catálogo.`;
+	});
+
 	const chordProblems = $derived(chordCatalogProblems(chords));
 	const assignedIds = $derived(chordPlacements.map(({ chordId }) => chordId));
 
@@ -45,6 +88,71 @@
 		lyrics = nextLyrics;
 		chordPlacements = remapped.placements;
 		placementsNeedReview ||= remapped.needsReview;
+		// Tras seguir escribiendo, deshacer la importación borraría lo escrito.
+		pastedImport = null;
+	}
+
+	async function placeCaret(position: number) {
+		await tick();
+		lyricsInput?.focus();
+		lyricsInput?.setSelectionRange(position, position);
+	}
+
+	/**
+	 * Si lo pegado es una letra con los acordes encima (o en formato ChordPro),
+	 * se separa: la letra va al texto y cada acorde al catálogo y a su posición.
+	 * Si no lo parece, el navegador pega como siempre.
+	 */
+	function pasteLyrics(event: ClipboardEvent) {
+		const raw = event.clipboardData?.getData('text/plain');
+		const sheet = raw ? parseChordSheet(raw) : null;
+		if (!raw || !sheet || !lyricsInput) return;
+
+		const { selectionStart: start, selectionEnd: end } = lyricsInput;
+		const result = applyChordSheet(
+			{ lyrics, chords, placements: chordPlacements },
+			sheet,
+			start,
+			end,
+			createId
+		);
+		// Pasarse de algún límite haría fallar el guardado entero: mejor pegar el
+		// texto sin más y que el usuario decida.
+		if (
+			result.lyrics.length > LYRICS_MAX_LENGTH ||
+			result.chords.length > MAX_CHORDS_PER_SONG ||
+			result.placements.length > MAX_CHORD_PLACEMENTS_PER_SONG
+		) {
+			return;
+		}
+
+		event.preventDefault();
+		pastedImport = {
+			raw,
+			start,
+			end,
+			placed: sheet.placements.length,
+			added: result.added,
+			before: { lyrics, chords, chordPlacements, placementsNeedReview }
+		};
+		lyrics = result.lyrics;
+		chords = result.chords;
+		chordPlacements = result.placements;
+		placementsNeedReview ||= result.dropped;
+		placeCaret(start + sheet.lyrics.length);
+	}
+
+	function pasteAsPlainText() {
+		if (!pastedImport) return;
+		const { raw, start, end, before } = pastedImport;
+		const text = raw.replace(/\r\n?/g, '\n');
+		const spliced = splicePlacements(before.chordPlacements, start, end, text.length);
+		lyrics = before.lyrics.slice(0, start) + text + before.lyrics.slice(end);
+		chords = before.chords;
+		chordPlacements = spliced.placements;
+		placementsNeedReview = before.placementsNeedReview || spliced.dropped;
+		pastedImport = null;
+		placeCaret(start + text.length);
 	}
 
 	function deletePendingChord() {
@@ -65,18 +173,14 @@
 
 		saving = true;
 		error = null;
-		const normalizedLyrics = lyrics.replace(/\r\n?/g, '\n').trim();
-		const normalizedPlacements = remapPlacements(
-			lyrics,
-			normalizedLyrics,
-			chordPlacements
-		).placements;
+		const trimmed = trimLyrics(lyrics, chordPlacements);
 		const payload = {
 			title: title.trim(),
 			artist: artist.trim(),
-			lyrics: normalizedLyrics,
+			rhythm: rhythm.trim(),
+			lyrics: trimmed.lyrics,
 			chords,
-			chordPlacements: normalizedPlacements,
+			chordPlacements: trimmed.placements,
 			tagIds: selectedTagIds
 		};
 
@@ -119,6 +223,16 @@
 				placeholder="Opcional"
 			/>
 		</div>
+		<div>
+			<label class="label" for="song-rhythm">Ritmo</label>
+			<input
+				id="song-rhythm"
+				class="input"
+				bind:value={rhythm}
+				maxlength={RHYTHM_MAX_LENGTH}
+				placeholder="4/4, merengue, 6/8 lento…"
+			/>
+		</div>
 	</div>
 
 	<div class="field">
@@ -145,9 +259,20 @@
 			id="song-lyrics"
 			class="input lyrics"
 			value={lyrics}
+			bind:this={lyricsInput}
 			oninput={updateLyrics}
+			onpaste={pasteLyrics}
 			maxlength={LYRICS_MAX_LENGTH}
-			placeholder="Pega aquí la letra completa"></textarea>
+			placeholder="Pega aquí la letra completa, con los acordes encima si los tiene"></textarea>
+		{#if pastedImport}
+			<p class="hint import-notice">
+				<Icon name="check" size={14} />
+				<span>{importSummary}</span>
+				<button type="button" class="link-button" onclick={pasteAsPlainText}>
+					Pegar como texto
+				</button>
+			</p>
+		{/if}
 		{#if placementsNeedReview}
 			<p class="hint review-warning">
 				La letra cambió alrededor de un acorde. Revisa su alineación cuando guardes.
@@ -192,6 +317,22 @@
 	.lyrics {
 		min-height: 14rem;
 		font-size: 0.95rem;
+	}
+	.import-notice {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.375rem;
+		color: var(--color-subtle);
+	}
+	.link-button {
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--color-text);
+		font: inherit;
+		text-decoration: underline;
+		cursor: pointer;
 	}
 	.review-warning {
 		color: var(--color-subtle);

@@ -2,6 +2,7 @@ import { json, redirect, type Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { getUserBySessionToken, SESSION_COOKIE } from '$lib/server/session';
 import { toSessionUser } from '$lib/server/users';
+import { parseTheme, THEME_COOKIE } from '$lib/theme';
 
 /**
  * Lo único alcanzable sin sesión. /api/health entra aquí porque el healthcheck
@@ -26,6 +27,18 @@ const sessionHandle: Handle = async ({ event, resolve }) => {
 	}
 
 	return resolve(event);
+};
+
+/**
+ * El tema se escribe en el `<html>` desde el servidor (ver app.html) para que la
+ * primera pintura ya salga con el tema elegido, sin parpadeo.
+ */
+const themeHandle: Handle = async ({ event, resolve }) => {
+	const theme = parseTheme(event.cookies.get(THEME_COOKIE));
+	event.locals.theme = theme;
+	return resolve(event, {
+		transformPageChunk: ({ html }) => html.replace('%oursongs.theme%', theme)
+	});
 };
 
 const authGuard: Handle = async ({ event, resolve }) => {
@@ -83,4 +96,4 @@ const securityHeaders: Handle = async ({ event, resolve }) => {
 
 // El guard necesita la sesión ya resuelta, y va dentro de securityHeaders para
 // que incluso sus 401 y sus redirects salgan con las cabeceras puestas.
-export const handle: Handle = sequence(sessionHandle, securityHeaders, authGuard);
+export const handle: Handle = sequence(sessionHandle, themeHandle, securityHeaders, authGuard);

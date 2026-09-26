@@ -127,6 +127,58 @@ export function offsetAtColumn(line: LyricLine, column: number): number {
 	return line.start + graphemes[column].offset;
 }
 
+/**
+ * Reajusta las posiciones cuando el texto entre `start` y `end` se sustituye por
+ * `insertedLength` caracteres (pegar sobre una selección). Lo de delante se queda,
+ * lo de detrás se desplaza y lo que estaba sobre el texto sustituido se pierde.
+ */
+export function splicePlacements(
+	placements: ChordPlacement[],
+	start: number,
+	end: number,
+	insertedLength: number
+): { placements: ChordPlacement[]; dropped: boolean } {
+	const delta = insertedLength - (end - start);
+	let dropped = false;
+	const next: ChordPlacement[] = [];
+	for (const placement of placements) {
+		if (placement.offset >= end) next.push({ ...placement, offset: placement.offset + delta });
+		else if (placement.offset > start) dropped = true;
+		else next.push({ ...placement });
+	}
+	return { placements: next, dropped };
+}
+
+/**
+ * Quita los espacios y saltos de línea de los extremos de la letra sin perder
+ * acordes: una línea de solo acordes (una intro, un final) es una línea de
+ * espacios, y un `trim()` a ciegas se la llevaría por delante con sus acordes.
+ * Por eso el recorte se hace aquí, donde se conocen las posiciones, y el
+ * servidor ya no recorta.
+ */
+export function trimLyrics(
+	text: string,
+	placements: ChordPlacement[]
+): { lyrics: string; placements: ChordPlacement[] } {
+	const firstText = text.search(/\S/);
+	if (firstText === -1 && placements.length === 0) return { lyrics: '', placements: [] };
+
+	const offsets = placements.map(({ offset }) => offset);
+	let start = firstText === -1 ? text.length : firstText;
+	const firstPlacement = Math.min(...offsets);
+	// Un acorde antes del primer texto: se conserva su línea entera.
+	if (firstPlacement < start) start = text.lastIndexOf('\n', firstPlacement - 1) + 1;
+	const end = Math.max(text.trimEnd().length, ...offsets);
+
+	return {
+		lyrics: text.slice(start, end),
+		placements: placements.map((placement) => ({
+			...placement,
+			offset: placement.offset - start
+		}))
+	};
+}
+
 export function removePlacementsForChord(
 	placements: ChordPlacement[],
 	chordId: string

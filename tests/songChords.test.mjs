@@ -37,6 +37,11 @@ describe('catálogo de acordes', () => {
 		).toThrow('El catálogo contiene un identificador repetido');
 	});
 
+	test('acepta un ID nuevo del cliente si tiene formato de UUID', () => {
+		const id = '3f2b8c1e-9a4d-4f6b-8e2a-1c5d7e9f0a3b';
+		expect(normalizeChordCatalog([{ id, value: 'C' }], [])).toEqual([{ id, value: 'C' }]);
+	});
+
 	test('rechaza acordes normalizados duplicados', () => {
 		expect(() => normalizeChordCatalog([{ value: 'am' }, { value: 'Am' }])).toThrow(
 			'El catálogo no puede repetir acordes'

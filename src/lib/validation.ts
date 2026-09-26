@@ -13,6 +13,8 @@ export const NAME_MAX_LENGTH = 60;
 
 export const TITLE_MAX_LENGTH = 120;
 export const ARTIST_MAX_LENGTH = 120;
+/** Texto libre ("4/4", "merengue", "6/8 lento"): solo se limita el largo. */
+export const RHYTHM_MAX_LENGTH = 60;
 export const LYRICS_MAX_LENGTH = 20_000;
 
 export const TAG_NAME_MAX_LENGTH = 40;

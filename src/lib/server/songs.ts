@@ -4,7 +4,12 @@ import { NotFoundError, ValidationError } from './errors';
 import { normalizeSongChordState } from './songChords';
 import { escapeRegex } from './text';
 import { resolveTagIds, toTagId } from './tags';
-import { ARTIST_MAX_LENGTH, LYRICS_MAX_LENGTH, TITLE_MAX_LENGTH } from '$lib/validation';
+import {
+	ARTIST_MAX_LENGTH,
+	LYRICS_MAX_LENGTH,
+	RHYTHM_MAX_LENGTH,
+	TITLE_MAX_LENGTH
+} from '$lib/validation';
 import type { ChordPlacement, Song, SongChord, SongInput, SongSummary } from '$lib/types';
 
 const SONGS_COLLECTION = 'songs';
@@ -13,6 +18,8 @@ export interface SongDoc {
 	_id: ObjectId;
 	title: string;
 	artist?: string;
+	/** Texto libre: compás, estilo o ambos ("4/4", "merengue", "6/8 lento"). */
+	rhythm?: string;
 	/** La letra es un único string, con los saltos de línea normalizados. */
 	lyrics: string;
 	/** Catálogo sin orden musical; el id mantiene las apariciones al renombrar. */
@@ -32,13 +39,21 @@ type SongSummaryDoc = Omit<
 	'lyrics' | 'chordPlacements' | 'createdAt' | 'createdBy' | 'updatedBy'
 >;
 
-const SUMMARY_PROJECTION = { title: 1, artist: 1, chords: 1, tagIds: 1, updatedAt: 1 } as const;
+const SUMMARY_PROJECTION = {
+	title: 1,
+	artist: 1,
+	rhythm: 1,
+	chords: 1,
+	tagIds: 1,
+	updatedAt: 1
+} as const;
 
 export function toSongSummary(doc: SongSummaryDoc): SongSummary {
 	return {
 		id: doc._id.toString(),
 		title: doc.title,
 		...(doc.artist && { artist: doc.artist }),
+		...(doc.rhythm && { rhythm: doc.rhythm }),
 		chords: (doc.chords ?? []).map((chord) => ({ ...chord })),
 		tagIds: (doc.tagIds ?? []).map((id) => id.toString()),
 		updatedAt: doc.updatedAt.toISOString()
@@ -84,12 +99,29 @@ function normalizeArtist(artist: unknown): string | undefined {
 	return clean;
 }
 
+/** Sin formato que validar: es texto libre, solo se limpia y se limita el largo. */
+function normalizeRhythm(rhythm: unknown): string | undefined {
+	if (rhythm === undefined || rhythm === null) return undefined;
+	if (typeof rhythm !== 'string') throw new ValidationError('El ritmo no es válido');
+	const clean = rhythm.trim().replace(/\s+/g, ' ');
+	if (!clean) return undefined;
+	if (clean.length > RHYTHM_MAX_LENGTH) {
+		throw new ValidationError(`El ritmo no puede pasar de ${RHYTHM_MAX_LENGTH} caracteres`);
+	}
+	return clean;
+}
+
 function normalizeLyrics(lyrics: unknown): string {
 	if (lyrics === undefined || lyrics === null) return '';
 	if (typeof lyrics !== 'string') throw new ValidationError('La letra no es válida');
 	// Un textarea manda CRLF en Windows: lo dejamos todo en saltos simples para
 	// que la letra se muestre y se cuente igual venga de donde venga.
-	const clean = lyrics.replace(/\r\n?/g, '\n').trim();
+	const unix = lyrics.replace(/\r\n?/g, '\n');
+	// Sin `trim()`: una línea de solo acordes al principio o al final es una
+	// línea de espacios, y recortarla movería los offsets que manda el cliente.
+	// Los extremos los recorta el formulario con `trimLyrics`, que sabe dónde
+	// hay acordes.
+	const clean = unix.trim() ? unix : '';
 	if (clean.length > LYRICS_MAX_LENGTH) {
 		throw new ValidationError(`La letra no puede pasar de ${LYRICS_MAX_LENGTH} caracteres`);
 	}
@@ -135,6 +167,7 @@ export async function getSong(id: string): Promise<Song | null> {
 export async function createSong(input: SongInput, userId: ObjectId): Promise<Song> {
 	const now = new Date();
 	const artist = normalizeArtist(input.artist);
+	const rhythm = normalizeRhythm(input.rhythm);
 	const lyrics = normalizeLyrics(input.lyrics);
 	const { chords, chordPlacements } = normalizeSongChordState({
 		lyrics,
@@ -144,6 +177,7 @@ export async function createSong(input: SongInput, userId: ObjectId): Promise<So
 	const doc = {
 		title: normalizeTitle(input.title),
 		...(artist && { artist }),
+		...(rhythm && { rhythm }),
 		lyrics,
 		chords,
 		chordPlacements,
@@ -177,6 +211,11 @@ export async function updateSong(id: string, patch: SongInput, userId: ObjectId)
 		const artist = normalizeArtist(patch.artist);
 		if (artist) set.artist = artist;
 		else unset.artist = '';
+	}
+	if (patch.rhythm !== undefined) {
+		const rhythm = normalizeRhythm(patch.rhythm);
+		if (rhythm) set.rhythm = rhythm;
+		else unset.rhythm = '';
 	}
 	const lyrics = patch.lyrics === undefined ? current.lyrics : normalizeLyrics(patch.lyrics);
 	const chordState = normalizeSongChordState(

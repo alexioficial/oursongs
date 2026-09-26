@@ -68,6 +68,8 @@
 
 <style>
 	.confirm-dialog {
+		/* El reset de Tailwind quita el `margin: auto` con el que el navegador centra el <dialog>. */
+		margin: auto;
 		width: min(28rem, calc(100vw - 2rem));
 		max-width: none;
 		padding: 0;
@@ -78,7 +80,7 @@
 		overflow: visible;
 	}
 	.confirm-dialog::backdrop {
-		background: rgba(0, 0, 0, 0.72);
+		background: var(--color-backdrop);
 		backdrop-filter: blur(3px);
 	}
 	.dialog-card {

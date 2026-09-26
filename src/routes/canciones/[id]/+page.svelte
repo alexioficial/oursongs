@@ -77,8 +77,14 @@
 		{/snippet}
 	</PageHeader>
 
-	{#if songTags.length > 0}
+	{#if data.song.rhythm || songTags.length > 0}
 		<div class="tags">
+			{#if data.song.rhythm}
+				<span class="badge" title="Ritmo">
+					<Icon name="metronome" size={12} />
+					{data.song.rhythm}
+				</span>
+			{/if}
 			{#each songTags as tag (tag.id)}
 				<span class="badge badge-strong"><Icon name="tag" size={12} /> {tag.name}</span>
 			{/each}

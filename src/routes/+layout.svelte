@@ -1,15 +1,28 @@
 <script lang="ts">
 	import './layout.css';
+	import { untrack } from 'svelte';
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import Nav from '$lib/components/Nav.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import { THEME_COOKIE, type Theme } from '$lib/theme';
 	import type { LayoutData } from './$types';
 
 	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
 
 	const bare = $derived(page.url.pathname === '/login');
+
+	// El servidor ya pintó el <html> con este tema; a partir de aquí lo lleva el cliente.
+	let theme = $state<Theme>(untrack(() => data.theme));
+	const nextThemeLabel = $derived(theme === 'dark' ? 'Modo claro' : 'Modo oscuro');
+
+	function toggleTheme() {
+		theme = theme === 'dark' ? 'light' : 'dark';
+		document.documentElement.dataset.theme = theme;
+		// Un año: es una preferencia del dispositivo, no de la sesión.
+		document.cookie = `${THEME_COOKIE}=${theme}; path=/; max-age=31536000; samesite=lax`;
+	}
 
 	async function logout() {
 		await fetch('/api/auth/logout', {
@@ -42,6 +55,10 @@
 						<strong title={data.user.username}>{data.user.name ?? data.user.username}</strong>
 					</div>
 				{/if}
+				<button class="rail-action" onclick={toggleTheme}>
+					<Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
+					<span>{nextThemeLabel}</span>
+				</button>
 				<button class="rail-action" onclick={logout}>
 					<Icon name="logout" size={18} />
 					<span>Cerrar sesión</span>
@@ -62,6 +79,14 @@
 								{data.user.name ?? data.user.username}
 							</span>
 						{/if}
+						<button
+							class="icon-btn"
+							title={nextThemeLabel}
+							aria-label={nextThemeLabel}
+							onclick={toggleTheme}
+						>
+							<Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
+						</button>
 						<button
 							class="icon-btn"
 							title="Cerrar sesión"
