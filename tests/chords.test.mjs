@@ -136,8 +136,36 @@ describe('lo que no es un acorde', () => {
 		expect(isValidChord('C'.repeat(40))).toBe(false);
 	});
 
+	test('ni las palabras que empiezan por una nota', () => {
+		for (const word of ['Amor', 'Dame', 'Gente', 'Bebe', 'Ella', 'Ama', 'Emi', 'Camino', 'Cxyz']) {
+			expect(isValidChord(word)).toBe(false);
+		}
+	});
+
 	test('los acordes de verdad sí', () => {
-		for (const chord of ['C', 'F#m', 'Bb', 'G#m7add11/D#', 'Cmaj7(#11)', 'Ddim', 'E+', 'Am7']) {
+		for (const chord of [
+			'C',
+			'F#m',
+			'Bb',
+			'G#m7add11/D#',
+			'Cmaj7(#11)',
+			'Ddim',
+			'E+',
+			'Am7',
+			'am7',
+			'C6/9',
+			'Csus4',
+			'C7M',
+			'Cm7(b5)',
+			'C7#9',
+			'Cma7',
+			'Cmi7',
+			'Cø7',
+			'C°',
+			'Cm(maj7)',
+			'C7alt',
+			'Cadd9/E'
+		]) {
 			expect(isValidChord(chord)).toBe(true);
 		}
 	});

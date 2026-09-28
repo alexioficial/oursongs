@@ -2,7 +2,6 @@ import { ObjectId, type Db, type Filter } from 'mongodb';
 import { getDb } from './db';
 import { NotFoundError, ValidationError } from './errors';
 import { normalizeSongChordState } from './songChords';
-import { escapeRegex } from './text';
 import { resolveTagIds, toTagId } from './tags';
 import { isDuplicateKeyError } from './users';
 import {
@@ -12,6 +11,7 @@ import {
 	TITLE_MAX_LENGTH,
 	UUID_REGEX
 } from '$lib/validation';
+import { accentInsensitivePattern } from '$lib/search';
 import type { ChordPlacement, Song, SongChord, SongInput, SongSummary } from '$lib/types';
 
 const SONGS_COLLECTION = 'songs';
@@ -148,7 +148,9 @@ export async function listSongs(query: SongQuery = {}): Promise<SongSummary[]> {
 
 	const search = query.search?.trim();
 	if (search) {
-		const pattern = new RegExp(escapeRegex(search), 'i');
+		// Sin índice que la ayude: recorre la colección, que para un repertorio es
+		// poca cosa. Las tildes no cuentan, igual que en la copia sin conexión.
+		const pattern = new RegExp(accentInsensitivePattern(search), 'i');
 		filter.$or = [{ title: pattern }, { artist: pattern }];
 	}
 

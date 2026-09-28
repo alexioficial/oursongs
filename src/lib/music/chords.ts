@@ -42,8 +42,15 @@ const ACCIDENTAL_OFFSETS: Record<string, number> = { '#': 1, '♯': 1, b: -1, '�
 /** Raíz (letra + alteraciones) y todo lo que venga detrás. */
 const NOTE_REGEX = /^([A-Ga-g])([#b♯♭]*)(.*)$/;
 
-/** Caracteres admitidos en la calidad. La barra queda fuera a propósito. */
-const QUALITY_REGEX = /^[A-Za-z0-9#b♯♭+\-°ºøΔ∆()]*$/;
+/**
+ * La calidad se valida por piezas y no por caracteres sueltos: con cualquier
+ * letra valían "Amor", "Dame" o "Gente" (A + 'mor', D + 'ame'…). Las
+ * alternativas largas van antes que 'm'; 'ma' y 'mi' solo valen con un número
+ * detrás ('Cma7', 'Cmi7'), que solas dejarían pasar "Ama" o "Emi". La barra solo
+ * entra seguida de un número ('C6/9'): un bajo ya lo separó `parseChord`.
+ */
+const QUALITY_REGEX =
+	/^(?:maj|min|dim|aug|sus|add|alt|omit|dom|no|ma(?=\d)|mi(?=\d)|m|M|Δ|∆|°|º|ø|\+|-|\d+|[#b♯♭]|\(|\)|\/(?=\d))*$/u;
 
 export const MAX_CHORD_LENGTH = 24;
 

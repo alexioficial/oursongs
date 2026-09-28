@@ -266,6 +266,53 @@ export async function retryPendingSong(clientId: string) {
 	await synchronize();
 }
 
+const LOGOUT_KEY = 'oursongs:logout-pending';
+
+function setLogoutPending(value: boolean) {
+	try {
+		if (value) localStorage.setItem(LOGOUT_KEY, '1');
+		else localStorage.removeItem(LOGOUT_KEY);
+	} catch {
+		// Sin almacenamiento no se puede recordar; la sesión seguirá abierta.
+	}
+}
+
+/** ¿Se cerró sesión sin conexión y el servidor aún no se enteró? */
+export function logoutPending(): boolean {
+	try {
+		return localStorage.getItem(LOGOUT_KEY) === '1';
+	} catch {
+		return false;
+	}
+}
+
+/** Al entrar con otra sesión, lo apuntado ya no aplica. */
+export function forgetPendingLogout() {
+	setLogoutPending(false);
+}
+
+/**
+ * Cierra la sesión en el servidor. La cookie es httpOnly y solo él la puede
+ * borrar: si ahora no responde, queda apuntado y se termina en la próxima
+ * entrada con red. Si no, al volver la conexión el usuario seguiría dentro.
+ */
+export async function endServerSession(): Promise<boolean> {
+	try {
+		const response = await fetch('/api/auth/logout', {
+			method: 'POST',
+			headers: { accept: 'application/json' }
+		});
+		if (response.ok) {
+			setLogoutPending(false);
+			return true;
+		}
+	} catch {
+		// Sin red: se apunta abajo.
+	}
+	setLogoutPending(true);
+	return false;
+}
+
 /** Al cerrar sesión: fuera la copia, lo pendiente y la app guardada. */
 export async function clearOfflineData() {
 	if (!browser) return;

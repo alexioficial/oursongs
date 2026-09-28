@@ -104,3 +104,17 @@ describe('service worker', () => {
 		expect(shouldServeShell(404)).toBe(false);
 	});
 });
+
+describe('búsqueda sin tildes', () => {
+	const songs = [
+		song('1', 'Canción de cuna', { updatedAt: '2026-09-02T00:00:00.000Z' }),
+		song('2', 'Niño del tambor', { artist: 'José', updatedAt: '2026-09-01T00:00:00.000Z' })
+	];
+
+	test('sin tilde encuentra la palabra con tilde, y al revés', () => {
+		expect(filterSongs(songs, 'cancion', []).map(({ id }) => id)).toEqual(['1']);
+		expect(filterSongs(songs, 'jose', []).map(({ id }) => id)).toEqual(['2']);
+		expect(filterSongs(songs, 'nino', []).map(({ id }) => id)).toEqual(['2']);
+		expect(filterSongs(songs, 'CUNÁ', []).map(({ id }) => id)).toEqual(['1']);
+	});
+});

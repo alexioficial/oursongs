@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import Icon from '$lib/components/Icon.svelte';
 	import { ClientApiError, jsonRequest } from '$lib/client/json';
+	import { forgetPendingLogout } from '$lib/offline/sync.svelte';
 
 	let loading = $state(false);
 	let loginError = $state<string | null>(null);
@@ -28,6 +29,8 @@
 				username: String(form.get('username') ?? '').trim(),
 				password: String(form.get('password') ?? '')
 			});
+			// Un cierre de sesión que quedó a medias sin conexión no puede cerrar esta.
+			forgetPendingLogout();
 			window.location.assign(safeRedirect());
 		} catch (error) {
 			loginError =

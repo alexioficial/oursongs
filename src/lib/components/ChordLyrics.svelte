@@ -26,10 +26,19 @@
 		onEdit: () => void;
 		/** Sin conexión (o sin subir aún) no se ofrece editar ni alinear. */
 		readOnly?: boolean;
+		/** Solo para la vista; la ficha lo lee para imprimir en el mismo tono. */
+		semitones?: number;
 	}
 
-	let { lyrics, chords, placements, songId, onEdit, readOnly = false }: Props = $props();
-	let semitones = $state(0);
+	let {
+		lyrics,
+		chords,
+		placements,
+		songId,
+		onEdit,
+		readOnly = false,
+		semitones = $bindable(0)
+	}: Props = $props();
 	let accidentals = $state<Accidentals>('auto');
 
 	const chordValues = $derived(chords.map(({ value }) => value));

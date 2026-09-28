@@ -18,6 +18,11 @@
 	let { data }: { data: PageData } = $props();
 
 	let editing = $state(false);
+	// La transposición de la vista viaja a la hoja para imprimir.
+	let semitones = $state(0);
+	const printPath = $derived(
+		resolve(`/canciones/${data.song.id}/imprimir${semitones ? `?tono=${semitones}` : ''}`)
+	);
 	let confirmingDelete = $state(false);
 	let deleting = $state(false);
 	let error = $state<string | null>(null);
@@ -81,6 +86,10 @@
 {:else}
 	<PageHeader title={data.song.title} subtitle={data.song.artist ?? ''}>
 		{#snippet action()}
+			<!-- Imprimir no necesita red: la canción ya está en pantalla. -->
+			<a class="icon-btn" href={printPath} title="Imprimir o guardar en PDF" aria-label="Imprimir">
+				<Icon name="printer" size={18} />
+			</a>
 			{#if !readOnly}
 				<a class="btn btn-ghost" href={resolve('/canciones/[id]/alinear', { id: data.song.id })}>
 					<Icon name="lyrics" size={16} /> Alinear acordes
@@ -144,6 +153,7 @@
 		songId={data.song.id}
 		onEdit={() => (editing = true)}
 		{readOnly}
+		bind:semitones
 	/>
 
 	{#if !data.pending}

@@ -43,10 +43,11 @@ interface SheetLine {
 }
 
 /*
- * Gramática estricta para DETECTAR acordes. `isValidChord` es tolerante a
- * propósito (acepta cualquier letra en la calidad) y con ella "Dame" o
- * "Cantemos" pasarían por acordes: aquí solo valen las piezas que de verdad se
- * escriben en un acorde. Las alternativas largas van antes que 'm'.
+ * Gramática estricta para DETECTAR acordes. `isValidChord` decide qué se puede
+ * guardar y admite más formas (la raíz en minúscula de un 'am7', un 'C6/9'); al
+ * pegar una letra hace falta ser más exigente para no confundir palabras con
+ * acordes, así que aquí solo valen estas piezas. Las alternativas largas van
+ * antes que 'm'.
  */
 const NOTE = '[A-G](?:#|b|♯|♭)?';
 const QUALITY =

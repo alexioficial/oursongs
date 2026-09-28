@@ -3,6 +3,7 @@
  * prueben los tests. Lo que toca almacenamiento está en `db.ts`.
  */
 import { normalizeChord } from '../music/chords';
+import { searchKey } from '../search';
 import type { ChordPlacement, Song, SongChord, SongChordInput, SongSummary } from '../types';
 
 /** Lo que se manda al crear, ya con un id por acorde. */
@@ -32,17 +33,17 @@ export function nowIso(): string {
 	return new Date().toISOString();
 }
 
-/** Misma búsqueda que el servidor: título o artista, sin distinguir mayúsculas. */
+/** Misma búsqueda que el servidor: título o artista, sin distinguir mayúsculas ni tildes. */
 export function filterSongs<T extends SongSummary>(
 	songs: T[],
 	search: string,
 	tagIds: string[]
 ): T[] {
-	const needle = search.trim().toLocaleLowerCase('es');
+	const needle = searchKey(search.trim());
 	return songs
 		.filter((song) => {
 			if (needle) {
-				const haystack = `${song.title}\n${song.artist ?? ''}`.toLocaleLowerCase('es');
+				const haystack = searchKey(`${song.title}\n${song.artist ?? ''}`);
 				if (!haystack.includes(needle)) return false;
 			}
 			return tagIds.every((id) => song.tagIds.includes(id));

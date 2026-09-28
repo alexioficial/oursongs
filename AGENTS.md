@@ -139,17 +139,21 @@ src/
     music/chords.ts          transposición; puro, sin dependencias, con tests
     music/chordPlacements.ts posiciones de acordes sobre la letra (grafemas)
     music/chordSheet.ts      importar letras con acordes encima o ChordPro
+    music/printLayout.ts     cómo se parte una línea con acordes en la hoja impresa
+    print.ts                 opciones de impresión (papel, colores…) y cuánto cabe
+    search.ts                búsqueda sin tildes; la usan el servidor y la copia local
     validation.ts            límites compartidos (cliente + servidor + scripts)
     types.ts                 DTOs que cruzan al cliente
     client/json.ts           fetch + traducción de `{ error }` a excepción
     client/ids.ts            UUID en el navegador (también sin https)
     offline/                 modo sin conexión (§4.1): db.ts (IndexedDB),
                              sync.svelte.ts (estado y sincronización),
-                             load.ts (apiGet), logic.ts (puro, con tests)
+                             load.ts (apiGet), songPage.ts (carga de una
+                             canción con respaldo local), logic.ts (puro, con tests)
     theme.ts                 tema claro/oscuro en cookie
     components/              Icon, Nav, PageHeader, EmptyState, Modal,
                              ConfirmDialog, SongForm, TagPicker, ChordLyrics,
-                             ChordCatalogEditor, ChordAlignmentEditor
+                             ChordCatalogEditor, ChordAlignmentEditor, PrintSheet
     server/
       db.ts                  conexión reusada + ensureIndexes + CI_COLLATION
       users.ts  session.ts   cuentas y sesiones
@@ -158,7 +162,7 @@ src/
       errors.ts              ValidationError / ConflictError / NotFoundError
       apiHelpers.ts          readObjectBody, requireUserId, failure
       requestBody.ts         lectura del cuerpo con tope de tamaño
-      text.ts                escapeRegex, slugify
+      text.ts                slugify
   routes/
     canciones/  tags/  login/
     app-shell/               carcasa sin SSR que el service worker sirve sin red
@@ -191,7 +195,35 @@ Lo que no se puede romper:
   parcial). Si la subida se corta después de guardar, el reintento devuelve la
   misma canción en vez de duplicarla.
 - **Cerrar sesión borra la copia** (`clearOfflineData`); si hay canciones sin
-  subir, se avisa antes.
+  subir, se avisa antes. Sin red la cookie (httpOnly) no se puede borrar: queda
+  apuntado en `localStorage` y el layout termina de cerrar la sesión en la
+  siguiente entrada con red, antes de volver a descargar nada.
+- **Imprimir** (`canciones/[id]/imprimir`) usa la misma carga que la ficha
+  (`loadSongPage`), así que también funciona sin red.
+
+### 4.2. Imprimir
+
+La hoja la imprime el navegador (`window.print()`); no hay PDF generado en el
+servidor. Lo que hay que saber para tocarla:
+
+- **`ssr = false`** en esa ruta: las opciones viven en `localStorage` y hay que
+  medir la fuente; pintada en el servidor saldría con las de por defecto y
+  saltaría al hidratar. Sigue siendo una carga universal.
+- **El papel se pide con `@page { size }`**, que la página inyecta en un
+  `<style>` propio (el del componente no admite valores dinámicos). No escribas
+  la etiqueta `<style>` en un comentario dentro del `<script>` de un componente:
+  el preprocesador la toma por la del componente y svelte-check falla.
+- **Todo en mm y pt**: valen lo mismo en pantalla que en papel, así que lo que
+  cabe en la vista previa cabe al imprimir. La vista previa se reduce con `zoom`
+  y la medida de la fuente (`advance`) se toma fuera de ese zoom.
+- **Las líneas las parte `wrapChordLine`, no el navegador**: partir por separado
+  la fila de acordes y la de letra los descuadra. Cuánto cabe lo calcula
+  `columnCapacity` con el ancho del carácter medido en el navegador (la fuente
+  monoespaciada cambia según el sistema).
+- **La hoja es blanca siempre**, también con el tema oscuro: es la única excepción
+  a "nada de colores fijos", y los colores del texto los elige quien imprime.
+
+### 4.3. Probar el modo sin conexión
 
 Para probarlo de verdad hace falta el build de producción: en `bun run dev`, Vite
 sirve los módulos bajo demanda y el service worker no puede guardarlos. Apagar el
@@ -265,10 +297,13 @@ Lo importante, y lo que no hay que "arreglar":
 - La escritura (♯/♭) se resuelve **para toda la lista**, no acorde por acorde, con
   `resolveSpelling`: manda la mayoría y con empate gana el sostenido.
 - Lo que no parsea se devuelve tal cual en vez de romperse, y `isValidChord` lo
-  rechaza al guardar.
+  rechaza al guardar. La calidad se valida **por piezas** (`maj`, `sus`, `m`,
+  números, `#`/`b`…), no por caracteres sueltos: así "Amor" o "Dame" no pasan
+  por acordes. Si una forma real de escribir un acorde no entra, añade la pieza a
+  `QUALITY_REGEX` con su test.
 
-Si tocas este archivo, los tests de `tests/chords.test.mjs` son el contrato: 27
-casos que incluyen `G#m7add11/D#`, `C6/9` (barra que no es bajo), la vuelta de
+Si tocas este archivo, los tests de `tests/chords.test.mjs` son el contrato: los
+casos incluyen `G#m7add11/D#`, `C6/9` (barra que no es bajo), la vuelta de
 octava y la basura. Añade casos, no los relajes.
 
 ### 5.4. Validación

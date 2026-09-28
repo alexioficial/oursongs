@@ -57,13 +57,21 @@ cambio de contraseña, alta desde el terminal de Coolify y baja de una cuenta.
 
 ## Las pantallas
 
-- **Canciones** (`/canciones`) — lista con buscador por título/artista y filtro
+- **Canciones** (`/canciones`) — lista con buscador por título/artista (sin
+  distinguir tildes: "cancion" encuentra "Canción") y filtro
   por tags (todo en la URL, así que un enlace reproduce la misma vista). Desde
   aquí se registra una canción nueva.
   - **Ficha** (`/canciones/[id]`) — acordes alineados sobre la letra, transposición,
     edición y borrado. La pantalla `/canciones/[id]/alinear` permite colocar cada
     aparición de un acorde en la posición exacta de la letra arrastrándolo, con una
     vista previa de cómo queda (en táctil, tras mantenerlo pulsado).
+  - **Imprimir** (`/canciones/[id]/imprimir`) — hoja blanca con título, artista,
+    ritmo, tags y la letra con sus acordes, lista para imprimir o guardar en PDF
+    desde el diálogo del navegador. Se elige el papel (A4, Oficio o Carta), el
+    tamaño del texto, dos colores (letra y títulos / acordes y artista, cada uno
+    con negrita opcional), el tono en semitonos y una o dos columnas (dos por
+    defecto). Las opciones se recuerdan en el dispositivo; el tono arranca en el
+    que se estaba viendo en la ficha. Funciona también sin conexión.
   - **Pegar una letra con acordes**: si lo que se pega en la letra trae los
     acordes encima (como en cualquier cancionero) o en formato ChordPro
     (`[C]Hola`), se separan solos: la letra va al texto y cada acorde al catálogo y
@@ -80,8 +88,8 @@ corto cuando estás registrándola.
 Cada vez que alguien entra, la app descarga en segundo plano el repertorio
 entero, con letra, acordes y tags, y lo guarda en el dispositivo. Una barra
 pequeña abajo a la derecha enseña el progreso. Si luego se va internet, o la app
-se abre sin él, las canciones siguen ahí: se pueden ver, buscar, filtrar por tags
-y transponer.
+se abre sin él, las canciones siguen ahí: se pueden ver, buscar, filtrar por tags,
+transponer e imprimir.
 
 Sin conexión **solo se puede crear**: editar, borrar, alinear y la pantalla de
 Tags necesitan al servidor. Lo creado queda marcado "Sin subir" y se sube solo al
@@ -90,7 +98,8 @@ que haya. Si el servidor rechaza alguna (por ejemplo, un dato inválido), se que
 marcada con el motivo para reintentarla o descartarla.
 
 Cerrar sesión borra la copia del dispositivo; si hay canciones sin subir, avisa
-antes.
+antes. Sin conexión la sesión del servidor no se puede cerrar todavía: queda
+apuntado y se cierra en cuanto la app vuelve a tener red.
 
 ## Los acordes y la transposición
 
@@ -127,11 +136,14 @@ src/
   hooks.server.ts           sesión, guard de rutas y cabeceras de seguridad
   lib/
     music/chords.ts         transposición (puro, cliente y servidor)
+    music/printLayout.ts    cómo se parte una línea con acordes en la hoja impresa
+    print.ts                opciones de la hoja para imprimir (papel, colores…)
+    search.ts               búsqueda sin tildes, igual en servidor y sin conexión
     validation.ts           límites y formatos compartidos
     types.ts                tipos que cruzan al cliente (ids y fechas ya en string)
     client/json.ts          llamadas a la API desde el navegador
     components/             UI (SongForm, ChordCatalogEditor, ChordAlignmentEditor,
-                            ChordLyrics, TagPicker…)
+                            ChordLyrics, PrintSheet, TagPicker…)
     server/
       db.ts                 conexión reusada + índices
       users.ts session.ts   cuentas y sesiones (token hasheado en la base)

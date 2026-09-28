@@ -8,13 +8,22 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import SyncStatus from '$lib/components/SyncStatus.svelte';
-	import { clearOfflineData, pending, startOffline } from '$lib/offline/sync.svelte';
+	import {
+		clearOfflineData,
+		endServerSession,
+		logoutPending,
+		pending,
+		startOffline
+	} from '$lib/offline/sync.svelte';
 	import { THEME_COOKIE, type Theme } from '$lib/theme';
 	import type { LayoutData } from './$types';
 
 	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
 
-	const bare = $derived(page.url.pathname === '/login');
+	// Sin menú ni barras: el login y la hoja para imprimir ocupan la pantalla entera.
+	const bare = $derived(
+		page.url.pathname === '/login' || page.route.id === '/canciones/[id]/imprimir'
+	);
 
 	// El servidor ya pintó el <html> con este tema; a partir de aquí lo lleva el cliente.
 	let theme = $state<Theme>(untrack(() => data.theme));
@@ -28,9 +37,17 @@
 	}
 
 	// Cada entrada a la app sube lo pendiente y descarga el repertorio entero.
+	// Si se cerró sesión sin conexión, lo primero es terminar de cerrarla: la
+	// copia ya se borró y no hay que volver a descargarla.
 	$effect(() => {
-		if (data.user) startOffline(data.user);
+		if (!data.user) return;
+		if (logoutPending()) void finishPendingLogout();
+		else startOffline(data.user);
 	});
+
+	async function finishPendingLogout() {
+		if (await endServerSession()) window.location.assign(resolve('/login'));
+	}
 
 	let confirmingLogout = $state(false);
 
@@ -42,10 +59,7 @@
 
 	async function signOut() {
 		await clearOfflineData();
-		await fetch('/api/auth/logout', {
-			method: 'POST',
-			headers: { accept: 'application/json' }
-		}).catch(() => undefined);
+		await endServerSession();
 		// Recarga completa para no dejar en memoria datos de la sesión anterior.
 		window.location.assign(resolve('/login'));
 	}
