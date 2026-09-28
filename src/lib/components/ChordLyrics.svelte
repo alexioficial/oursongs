@@ -10,8 +10,7 @@
 	} from '$lib/music/chordPlacements';
 	import {
 		formatSemitones,
-		resolveSpelling,
-		transposeChord,
+		transposeChords,
 		wrapSemitones,
 		type Accidentals
 	} from '$lib/music/chords';
@@ -26,8 +25,9 @@
 		onEdit: () => void;
 		/** Sin conexión (o sin subir aún) no se ofrece editar ni alinear. */
 		readOnly?: boolean;
-		/** Solo para la vista; la ficha lo lee para imprimir en el mismo tono. */
+		/** Solo para la vista; la ficha los lee para imprimir igual que se ve. */
 		semitones?: number;
+		accidentals?: Accidentals;
 	}
 
 	let {
@@ -37,17 +37,17 @@
 		songId,
 		onEdit,
 		readOnly = false,
-		semitones = $bindable(0)
+		semitones = $bindable(0),
+		accidentals = $bindable('auto')
 	}: Props = $props();
-	let accidentals = $state<Accidentals>('auto');
 
 	const chordValues = $derived(chords.map(({ value }) => value));
-	const spelling = $derived(resolveSpelling(chordValues, accidentals));
-	const chordById = $derived(
-		new SvelteMap(
-			chords.map(({ id, value }) => [id, transposeChord(value, semitones, spelling)] as const)
-		)
-	);
+	// `transposeChords` y no acorde por acorde: así ♯/♭ se aplican también sin
+	// transponer, y la ficha y la hoja para imprimir escriben igual.
+	const chordById = $derived.by(() => {
+		const labels = transposeChords(chordValues, semitones, accidentals);
+		return new SvelteMap(chords.map(({ id }, index) => [id, labels[index]] as const));
+	});
 	const lines = $derived(splitLyricLines(lyrics));
 	const lineCount = $derived(lyrics ? lines.length : 0);
 	const steps = $derived(wrapSemitones(semitones));

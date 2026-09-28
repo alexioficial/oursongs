@@ -213,14 +213,29 @@ export function chordsToText(chords: string[]): string {
 	return chords.join(' ');
 }
 
-/** Transpone una lista entera con una escritura coherente para todos. */
+/** Reescribe las notas de un acorde con sostenidos o bemoles, sin moverlo. */
+export function respellChord(chord: string, spelling: Spelling): string {
+	const parsed = parseChord(chord);
+	if (!parsed) return chord;
+	const bass = parsed.bass ? `/${spellPitch(parsed.bass.pitch, spelling)}` : '';
+	return `${spellPitch(parsed.root.pitch, spelling)}${parsed.quality}${bass}`;
+}
+
+/**
+ * Transpone una lista entera con una escritura coherente para todos. Sin
+ * transponer y en automático la deja intacta (un 'Cb' sigue siendo 'Cb'); con
+ * la escritura forzada la reescribe igual, porque quien pide bemoles quiere
+ * verlos aunque no cambie de tono.
+ */
 export function transposeChords(
 	chords: string[],
 	semitones: number,
 	accidentals: Accidentals = 'auto'
 ): string[] {
 	const steps = wrapSemitones(semitones);
-	if (steps === 0) return [...chords];
+	if (steps === 0 && accidentals === 'auto') return [...chords];
 	const spelling = resolveSpelling(chords, accidentals);
-	return chords.map((chord) => transposeChord(chord, steps, spelling));
+	return chords.map((chord) =>
+		steps === 0 ? respellChord(chord, spelling) : transposeChord(chord, steps, spelling)
+	);
 }

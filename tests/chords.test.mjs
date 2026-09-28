@@ -86,6 +86,16 @@ describe('sostenidos o bemoles', () => {
 		expect(transposeChords(['Bb', 'Eb'], 1, 'sharp')).toEqual(['B', 'E']);
 	});
 
+	test('forzada, también reescribe sin transponer', () => {
+		expect(transposeChords(['A#m', 'D#7/A#', 'G'], 0, 'flat')).toEqual(['Bbm', 'Eb7/Bb', 'G']);
+		expect(transposeChords(['Bbm7(b5)', 'Db/Ab'], 0, 'sharp')).toEqual(['A#m7(b5)', 'C#/G#']);
+		expect(transposeChords(['A#m', 'N.C.'], 12, 'flat')).toEqual(['Bbm', 'N.C.']);
+	});
+
+	test('en automático y sin transponer, el texto queda intacto', () => {
+		expect(transposeChords(['Cb', 'A#m', 'Eb'], 0)).toEqual(['Cb', 'A#m', 'Eb']);
+	});
+
 	test('toda la lista comparte escritura, no cada acorde la suya', () => {
 		// Manda la mayoría: dos bemoles arrastran al sostenido suelto.
 		expect(transposeChords(['Eb', 'Ab', 'F#'], 2)).toEqual(['F', 'Bb', 'Ab']);

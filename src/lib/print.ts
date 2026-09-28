@@ -6,6 +6,8 @@
  * Todo lo que no toca `localStorage` es puro y lo prueban los tests.
  */
 
+import type { Accidentals } from './music/chords';
+
 export type PaperSize = 'a4' | 'oficio' | 'carta';
 
 export interface Paper {
@@ -149,6 +151,18 @@ export function columnCapacity(settings: PrintSettings, advance: number): number
 	const widthMm = (paper.width - 2 * PAGE_MARGIN_X - (columns - 1) * COLUMN_GAP) / columns;
 	const charPx = LYRICS_FONT_PT * (settings.textScale / 100) * PX_PER_PT * advance;
 	return Math.max(10, Math.floor((widthMm * PX_PER_MM) / charPx));
+}
+
+/**
+ * Cómo viaja la escritura de la ficha a la hoja (`?alteraciones=bemoles`). Como
+ * el tono, es de cada canción y no se guarda con las opciones.
+ */
+export const ACCIDENTAL_PARAMS = { sharp: 'sostenidos', flat: 'bemoles' } as const;
+
+export function parseAccidentalsParam(value: string | null): Accidentals {
+	if (value === ACCIDENTAL_PARAMS.sharp) return 'sharp';
+	if (value === ACCIDENTAL_PARAMS.flat) return 'flat';
+	return 'auto';
 }
 
 const STORAGE_KEY = 'oursongs:print';

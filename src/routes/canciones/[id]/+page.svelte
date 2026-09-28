@@ -7,6 +7,8 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import SongForm from '$lib/components/SongForm.svelte';
 	import { ClientApiError, jsonRequest } from '$lib/client/json';
+	import type { Accidentals } from '$lib/music/chords';
+	import { ACCIDENTAL_PARAMS } from '$lib/print';
 	import {
 		connection,
 		discardPendingSong,
@@ -18,10 +20,17 @@
 	let { data }: { data: PageData } = $props();
 
 	let editing = $state(false);
-	// La transposición de la vista viaja a la hoja para imprimir.
+	// La transposición y la escritura de la vista viajan a la hoja para imprimir.
 	let semitones = $state(0);
+	let accidentals = $state<Accidentals>('auto');
+	const printQuery = $derived(
+		[
+			...(semitones ? [`tono=${semitones}`] : []),
+			...(accidentals === 'auto' ? [] : [`alteraciones=${ACCIDENTAL_PARAMS[accidentals]}`])
+		].join('&')
+	);
 	const printPath = $derived(
-		resolve(`/canciones/${data.song.id}/imprimir${semitones ? `?tono=${semitones}` : ''}`)
+		resolve(`/canciones/${data.song.id}/imprimir${printQuery ? `?${printQuery}` : ''}`)
 	);
 	let confirmingDelete = $state(false);
 	let deleting = $state(false);
@@ -154,6 +163,7 @@
 		onEdit={() => (editing = true)}
 		{readOnly}
 		bind:semitones
+		bind:accidentals
 	/>
 
 	{#if !data.pending}

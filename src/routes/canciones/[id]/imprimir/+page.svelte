@@ -4,9 +4,15 @@
 	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/Icon.svelte';
 	import PrintSheet from '$lib/components/PrintSheet.svelte';
-	import { formatSemitones, wrapSemitones } from '$lib/music/chords';
+	import {
+		formatSemitones,
+		resolveSpelling,
+		wrapSemitones,
+		type Accidentals
+	} from '$lib/music/chords';
 	import {
 		columnCapacity,
+		parseAccidentalsParam,
 		DEFAULT_PRINT_SETTINGS,
 		isDefaultPrintSettings,
 		loadPrintSettings,
@@ -29,9 +35,20 @@
 	const settings = $state(loadPrintSettings());
 	$effect(() => savePrintSettings($state.snapshot(settings)));
 
-	// La ficha manda la transposición que se estaba viendo: se imprime eso.
+	// La ficha manda la transposición y la escritura que se estaban viendo: se
+	// imprime eso.
 	let semitones = $state(
 		untrack(() => wrapSemitones(Number(page.url.searchParams.get('tono')) || 0))
+	);
+	let accidentals = $state<Accidentals>(
+		untrack(() => parseAccidentalsParam(page.url.searchParams.get('alteraciones')))
+	);
+	// En automático manda lo que ya usa la canción; el botón marcado lo dice.
+	const spelling = $derived(
+		resolveSpelling(
+			data.song.chords.map(({ value }) => value),
+			accidentals
+		)
 	);
 
 	const songTags = $derived(
@@ -101,11 +118,14 @@
 		semitones = wrapSemitones(semitones + step);
 	}
 
-	const isDefault = $derived(isDefaultPrintSettings(settings) && semitones === 0);
+	const isDefault = $derived(
+		isDefaultPrintSettings(settings) && semitones === 0 && accidentals === 'auto'
+	);
 
 	function reset() {
 		Object.assign(settings, DEFAULT_PRINT_SETTINGS);
 		semitones = 0;
+		accidentals = 'auto';
 		open = null;
 	}
 
@@ -295,6 +315,34 @@
 					</button>
 				</span>
 			</div>
+			<div class="row static">
+				<span class="accidental-icon" aria-hidden="true">♯</span>
+				<span class="row-label">Alteraciones</span>
+				<span class="spelling" role="group" aria-label="Escritura de las alteraciones">
+					<button
+						type="button"
+						class="spell"
+						title="Escribir con sostenidos"
+						aria-label="Sostenidos"
+						aria-pressed={spelling === 'sharp'}
+						disabled={!settings.showChords}
+						onclick={() => (accidentals = 'sharp')}
+					>
+						♯
+					</button>
+					<button
+						type="button"
+						class="spell"
+						title="Escribir con bemoles"
+						aria-label="Bemoles"
+						aria-pressed={spelling === 'flat'}
+						disabled={!settings.showChords}
+						onclick={() => (accidentals = 'flat')}
+					>
+						♭
+					</button>
+				</span>
+			</div>
 		</div>
 
 		<div class="group">
@@ -333,7 +381,14 @@
 	<div class="preview">
 		<div class="preview-fit" bind:clientWidth={previewWidth}>
 			<div class="frame" style:zoom>
-				<PrintSheet song={data.song} tags={songTags} {settings} {semitones} {capacity} />
+				<PrintSheet
+					song={data.song}
+					tags={songTags}
+					{settings}
+					{semitones}
+					{accidentals}
+					{capacity}
+				/>
 			</div>
 		</div>
 	</div>
@@ -572,6 +627,36 @@
 		color: var(--color-text);
 		cursor: pointer;
 	}
+	.accidental-icon {
+		display: grid;
+		place-items: center;
+		width: 20px;
+		font-size: 1.2rem;
+		line-height: 1;
+	}
+	.spelling {
+		display: flex;
+		gap: 0.25rem;
+	}
+	.spell {
+		display: grid;
+		place-items: center;
+		width: 2.25rem;
+		height: 2rem;
+		padding: 0;
+		border: 1px solid var(--color-border-strong);
+		border-radius: var(--radius-control);
+		background: transparent;
+		color: var(--color-subtle);
+		font-size: 1rem;
+		cursor: pointer;
+	}
+	.spell[aria-pressed='true'] {
+		border-color: var(--color-bright);
+		background: var(--color-bright);
+		color: var(--color-bg);
+	}
+	.spell:disabled,
 	.step:disabled {
 		opacity: 0.4;
 		cursor: not-allowed;

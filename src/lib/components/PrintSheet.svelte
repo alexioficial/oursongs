@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { packChordRows, placementsForLine, splitLyricLines } from '$lib/music/chordPlacements';
-	import { transposeChords } from '$lib/music/chords';
+	import { transposeChords, type Accidentals } from '$lib/music/chords';
 	import { chordRowText, wrapChordLine } from '$lib/music/printLayout';
 	import {
 		COLUMN_GAP,
@@ -18,11 +18,12 @@
 		tags: Tag[];
 		settings: PrintSettings;
 		semitones: number;
+		accidentals: Accidentals;
 		/** Columnas de texto que caben en una columna de la hoja (ver `columnCapacity`). */
 		capacity: number;
 	}
 
-	let { song, tags, settings, semitones, capacity }: Props = $props();
+	let { song, tags, settings, semitones, accidentals, capacity }: Props = $props();
 
 	const paper = $derived(PAPERS[settings.paper]);
 
@@ -30,7 +31,8 @@
 	const chordById = $derived.by(() => {
 		const labels = transposeChords(
 			song.chords.map(({ value }) => value),
-			semitones
+			semitones,
+			accidentals
 		);
 		return new Map(song.chords.map(({ id }, index) => [id, labels[index]]));
 	});

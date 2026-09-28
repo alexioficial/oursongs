@@ -69,9 +69,9 @@ cambio de contraseña, alta desde el terminal de Coolify y baja de una cuenta.
     ritmo, tags y la letra con sus acordes, lista para imprimir o guardar en PDF
     desde el diálogo del navegador. Se elige el papel (A4, Oficio o Carta), el
     tamaño del texto, dos colores (letra y títulos / acordes y artista, cada uno
-    con negrita opcional), el tono en semitonos, una o dos columnas (dos por
-    defecto) y si llevan acordes o solo la letra. Las opciones se recuerdan en el dispositivo; el tono arranca en el
-    que se estaba viendo en la ficha. Funciona también sin conexión.
+    con negrita opcional), el tono en semitonos, sostenidos o bemoles, una o dos columnas (dos por
+    defecto) y si llevan acordes o solo la letra. Las opciones se recuerdan en el dispositivo; el tono y la escritura
+    arrancan en los que se estaban viendo en la ficha. Funciona también sin conexión.
   - **Pegar una letra con acordes**: si lo que se pega en la letra trae los
     acordes encima (como en cualquier cancionero) o en formato ChordPro
     (`[C]Hola`), se separan solos: la letra va al texto y cada acorde al catálogo y

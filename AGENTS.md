@@ -292,7 +292,9 @@ Lo importante, y lo que no hay que "arreglar":
   local y no manda nada al servidor. No añadas un endpoint para "guardar
   transpuesto" sin pedirlo explícitamente.
 - `transposeChord(x, 0)` devuelve el texto **intacto**, para que un `Cb` escrito a
-  mano no se convierta en su enarmónico `B`.
+  mano no se convierta en su enarmónico `B`. `transposeChords` también, pero solo
+  en automático: con ♯/♭ forzado reescribe la lista aunque no transponga
+  (`respellChord`), porque quien pide bemoles quiere verlos.
 - `wrapSemitones` mantiene el signo y vuelve a 0 a los ±12 (y no devuelve `-0`).
 - La escritura (♯/♭) se resuelve **para toda la lista**, no acorde por acorde, con
   `resolveSpelling`: manda la mayoría y con empate gana el sostenido.

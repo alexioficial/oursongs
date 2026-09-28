@@ -4,6 +4,7 @@ import {
 	columnCapacity,
 	DEFAULT_PRINT_SETTINGS,
 	isDefaultPrintSettings,
+	parseAccidentalsParam,
 	parsePrintSettings
 } from '../src/lib/print.ts';
 
@@ -124,6 +125,13 @@ describe('opciones de impresión', () => {
 		expect(settings.showChords).toBe(false);
 		expect(parsePrintSettings({ textScale: 12 }).textScale).toBe(60);
 		expect(parsePrintSettings({ textScale: 103 }).textScale).toBe(105);
+	});
+
+	test('la escritura llega de la ficha por la URL', () => {
+		expect(parseAccidentalsParam('bemoles')).toBe('flat');
+		expect(parseAccidentalsParam('sostenidos')).toBe('sharp');
+		expect(parseAccidentalsParam(null)).toBe('auto');
+		expect(parseAccidentalsParam('flat')).toBe('auto');
 	});
 
 	test('isDefaultPrintSettings', () => {
