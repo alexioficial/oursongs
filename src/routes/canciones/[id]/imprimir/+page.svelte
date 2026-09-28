@@ -275,6 +275,7 @@
 						class="step"
 						title="Bajar un semitono"
 						aria-label="Bajar un semitono"
+						disabled={!settings.showChords}
 						onclick={() => shift(-1)}
 					>
 						<Icon name="minus" size={15} />
@@ -287,6 +288,7 @@
 						class="step"
 						title="Subir un semitono"
 						aria-label="Subir un semitono"
+						disabled={!settings.showChords}
 						onclick={() => shift(1)}
 					>
 						<Icon name="plus" size={15} />
@@ -305,6 +307,17 @@
 			>
 				<Icon name="columns" size={20} />
 				<span class="row-label">Dos columnas</span>
+				<span class="switch" aria-hidden="true"></span>
+			</button>
+			<button
+				type="button"
+				class="row"
+				role="switch"
+				aria-checked={settings.showChords}
+				onclick={() => (settings.showChords = !settings.showChords)}
+			>
+				<Icon name="music" size={20} />
+				<span class="row-label">Acordes</span>
 				<span class="switch" aria-hidden="true"></span>
 			</button>
 		</div>
@@ -362,7 +375,8 @@
 		border-radius: var(--radius-overlay);
 		background: var(--color-surface);
 	}
-	.option + .option {
+	.option + .option,
+	.row + .row {
 		border-top: 1px solid var(--color-border-soft);
 	}
 	.option {
@@ -558,8 +572,12 @@
 		color: var(--color-text);
 		cursor: pointer;
 	}
+	.step:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
 	@media (hover: hover) {
-		.step:hover {
+		.step:hover:not(:disabled) {
 			background: var(--color-surface-2);
 		}
 	}

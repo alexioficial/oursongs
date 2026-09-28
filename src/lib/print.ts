@@ -80,6 +80,8 @@ export interface PrintSettings {
 	chordsColor: string;
 	chordsBold: boolean;
 	twoColumns: boolean;
+	/** Sin acordes sale solo la letra, para quien canta y no toca. */
+	showChords: boolean;
 }
 
 export const DEFAULT_PRINT_SETTINGS: Readonly<PrintSettings> = Object.freeze({
@@ -89,7 +91,8 @@ export const DEFAULT_PRINT_SETTINGS: Readonly<PrintSettings> = Object.freeze({
 	lyricsBold: false,
 	chordsColor: '#e8710a',
 	chordsBold: true,
-	twoColumns: true
+	twoColumns: true,
+	showChords: true
 });
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
@@ -120,6 +123,7 @@ export function parsePrintSettings(raw: unknown): PrintSettings {
 	if (typeof raw.lyricsBold === 'boolean') settings.lyricsBold = raw.lyricsBold;
 	if (typeof raw.chordsBold === 'boolean') settings.chordsBold = raw.chordsBold;
 	if (typeof raw.twoColumns === 'boolean') settings.twoColumns = raw.twoColumns;
+	if (typeof raw.showChords === 'boolean') settings.showChords = raw.showChords;
 	return settings;
 }
 

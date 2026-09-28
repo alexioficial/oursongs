@@ -36,16 +36,23 @@
 	});
 
 	const lines = $derived(
-		splitLyricLines(song.lyrics).map((line) => {
+		splitLyricLines(song.lyrics).flatMap((line) => {
 			const positioned = placementsForLine(line, song.chordPlacements, chordById);
-			return {
-				start: line.start,
-				blank: line.text.trim() === '' && positioned.length === 0,
-				parts: wrapChordLine(line.text, positioned, capacity).map((part) => ({
-					rows: packChordRows(part.chords).map(chordRowText),
-					text: part.text
-				}))
-			};
+			const empty = line.text.trim() === '';
+			// Una línea de solo acordes (una intro, un final) sin acordes no es nada:
+			// se quita entera en vez de dejar un hueco.
+			if (!settings.showChords && empty && positioned.length > 0) return [];
+			const chords = settings.showChords ? positioned : [];
+			return [
+				{
+					start: line.start,
+					blank: empty && chords.length === 0,
+					parts: wrapChordLine(line.text, chords, capacity).map((part) => ({
+						rows: packChordRows(part.chords).map(chordRowText),
+						text: part.text
+					}))
+				}
+			];
 		})
 	);
 </script>

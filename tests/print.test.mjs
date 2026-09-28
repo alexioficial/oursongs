@@ -101,7 +101,8 @@ describe('opciones de impresión', () => {
 				textScale: 'grande',
 				lyricsColor: 'red',
 				chordsColor: '#12345',
-				twoColumns: 'sí'
+				twoColumns: 'sí',
+				showChords: 'no'
 			})
 		).toEqual(DEFAULT_PRINT_SETTINGS);
 	});
@@ -112,13 +113,15 @@ describe('opciones de impresión', () => {
 			textScale: 999,
 			lyricsColor: '#1A73E8',
 			chordsBold: false,
-			twoColumns: false
+			twoColumns: false,
+			showChords: false
 		});
 		expect(settings.paper).toBe('carta');
 		expect(settings.textScale).toBe(160);
 		expect(settings.lyricsColor).toBe('#1a73e8');
 		expect(settings.chordsBold).toBe(false);
 		expect(settings.twoColumns).toBe(false);
+		expect(settings.showChords).toBe(false);
 		expect(parsePrintSettings({ textScale: 12 }).textScale).toBe(60);
 		expect(parsePrintSettings({ textScale: 103 }).textScale).toBe(105);
 	});
@@ -126,6 +129,7 @@ describe('opciones de impresión', () => {
 	test('isDefaultPrintSettings', () => {
 		expect(isDefaultPrintSettings({ ...DEFAULT_PRINT_SETTINGS })).toBe(true);
 		expect(isDefaultPrintSettings({ ...DEFAULT_PRINT_SETTINGS, twoColumns: false })).toBe(false);
+		expect(isDefaultPrintSettings({ ...DEFAULT_PRINT_SETTINGS, showChords: false })).toBe(false);
 	});
 
 	test('cabe más con una columna, con letra más pequeña o con papel más ancho', () => {
