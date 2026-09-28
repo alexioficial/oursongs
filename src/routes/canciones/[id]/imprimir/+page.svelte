@@ -693,6 +693,14 @@
 			min-height: 0;
 			padding: 0;
 		}
+		/*
+		 * Sin flex: dentro de un flex la hoja (con `width: auto` al imprimir) se
+		 * encoge a su línea más larga y sale centrada. Con dos columnas no se nota
+		 * porque las columnas llenan el ancho; con una sí.
+		 */
+		.preview-fit {
+			display: block;
+		}
 		.frame {
 			zoom: 1 !important;
 		}
