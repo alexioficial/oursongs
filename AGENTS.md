@@ -398,8 +398,11 @@ dependencias). Para uno nuevo, añade la entrada al mapa.
 
 `Dockerfile` multi-etapa con bun: `deps` → `build` → `prod-deps` → `runtime`, que
 corre como usuario `bun` sin privilegios y sirve `bun ./build/index.js` en
-`$HOST:$PORT` (3000). **No define `HEALTHCHECK`** a propósito; si se quiere, se
-configura en Coolify contra `GET /api/health`.
+`$HOST:$PORT` (3000). **No define `HEALTHCHECK`** a propósito; se configura en
+Coolify contra `GET /health` (alias de `/api/health`). **No quites `curl` del
+`apt-get install`**: Coolify corre el healthcheck dentro del contenedor con
+`curl` o `wget`, la imagen de bun no trae ninguno, y sin él cada deploy sale
+"unhealthy" y hace rollback aunque la app esté arriba.
 
 Variables de la aplicación: `MONGODB_URI` (obligatoria), `MONGODB_DB`, `ORIGIN`
 (obligatoria, con `https://`: Traefik termina el TLS y sin ella adapter-node

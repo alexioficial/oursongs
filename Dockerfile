@@ -11,8 +11,8 @@
 #   TZ           zona con la que se formatean las fechas que se muestran
 #
 # El contenedor escucha en el 3000 (EXPOSE); si Coolify no lo detecta solo, es el
-# valor de "Ports Exposes". La imagen no define HEALTHCHECK: si quieres uno, se
-# configura en Coolify apuntando a /api/health.
+# valor de "Ports Exposes". La imagen no define HEALTHCHECK: se configura en
+# Coolify apuntando a /health (o /api/health), y funciona porque lleva curl.
 #
 # Las cuentas se crean desde el terminal del contenedor:
 #   bun run create:user pepe --password "una contraseña larga"
@@ -40,9 +40,12 @@ RUN bun install --frozen-lockfile --production
 FROM oven/bun:1 AS runtime
 
 # ca-certificates para el TLS de la conexión a Mongo (Atlas y cualquier
-# mongodb+srv lo necesitan) y tzdata para que TZ signifique algo.
+# mongodb+srv lo necesitan), tzdata para que TZ signifique algo y curl para el
+# healthcheck: Coolify lo ejecuta DENTRO del contenedor con curl o wget, y la
+# imagen de bun no trae ninguno (sin él el deploy sale "unhealthy" y hace
+# rollback aunque la app esté arriba).
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends ca-certificates tzdata \
+	&& apt-get install -y --no-install-recommends ca-certificates tzdata curl \
 	&& rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production \
