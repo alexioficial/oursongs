@@ -108,8 +108,8 @@ coinciden y salta el aviso de hidratación. La zona sale de `TZ`.
 `src/hooks.server.ts` bloquea **todo** lo que no esté en ese `Set`: las páginas
 con un redirect a `/login`, y lo que empiece por `/api/` con un 401 JSON (un
 redirect haría que el `fetch` del cliente recibiera el HTML del login en vez de
-un error). Hoy la lista es `/login`, `/api/auth/login`, `/api/health` y
-`/api/session` (el layout la pide también en `/login`). Añadir un
+un error). Hoy la lista es `/login`, `/api/auth/login`, `/api/health`, `/health` (alias del
+anterior) y `/api/session` (el layout la pide también en `/login`). Añadir un
 endpoint público y olvidarse de esto es el fallo más fácil de cometer aquí — le
 pasó a `/api/health`, que existía pero contestaba 401 al healthcheck.
 

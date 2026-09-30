@@ -9,7 +9,13 @@ import { parseTheme, THEME_COOKIE } from '$lib/theme';
  * del contenedor no tiene cookie con la que identificarse, y /api/session porque
  * el layout la pide también en /login (y contesta `user: null`).
  */
-const PUBLIC_ROUTES = new Set(['/login', '/api/auth/login', '/api/health', '/api/session']);
+const PUBLIC_ROUTES = new Set([
+	'/login',
+	'/api/auth/login',
+	'/api/health',
+	'/health',
+	'/api/session'
+]);
 
 const sessionHandle: Handle = async ({ event, resolve }) => {
 	const token = event.cookies.get(SESSION_COOKIE);
