@@ -102,3 +102,21 @@ export function prepareChords(chords: SongChordInput[], createId: () => string):
 export function shouldServeShell(status: number): boolean {
 	return status === 429 || status >= 500;
 }
+
+/**
+ * Dónde se permite el modo sin conexión: solo en una página servida por https y
+ * que no sea la propia máquina. Un service worker y un IndexedDB pertenecen al
+ * origen (host + puerto), y en `localhost:5173` caben varios proyectos: el que
+ * dejara esta app ahí seguiría contestando en los demás.
+ */
+export function isOfflineOrigin(location: { protocol: string; hostname: string }): boolean {
+	if (location.protocol !== 'https:') return false;
+	const host = location.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+	const isLocal =
+		host === 'localhost' ||
+		host.endsWith('.localhost') ||
+		host === '0.0.0.0' ||
+		host === '::1' ||
+		host.startsWith('127.');
+	return !isLocal;
+}

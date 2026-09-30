@@ -16,6 +16,7 @@
 	import { applyChordSheet, parseChordSheet } from '$lib/music/chordSheet';
 	import { pendingToSong, prepareChords, type PendingSongInput } from '$lib/offline/logic';
 	import { connection, savePendingSong } from '$lib/offline/sync.svelte';
+	import { offlineEnabled } from '$lib/offline/support';
 	import {
 		ARTIST_MAX_LENGTH,
 		LYRICS_MAX_LENGTH,
@@ -225,7 +226,7 @@
 			// Sin respuesta del servidor, una canción nueva no se pierde: queda en el
 			// dispositivo y se sube sola al volver la conexión.
 			const unreachable = !(requestError instanceof ClientApiError) || requestError.status >= 500;
-			if (clientId && unreachable) {
+			if (clientId && unreachable && offlineEnabled()) {
 				await saveOnDevice(clientId, payload);
 				return;
 			}

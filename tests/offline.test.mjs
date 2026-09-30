@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
 	filterSongs,
+	isOfflineOrigin,
 	pendingToSong,
 	prepareChords,
 	shouldServeShell,
@@ -116,5 +117,29 @@ describe('búsqueda sin tildes', () => {
 		expect(filterSongs(songs, 'jose', []).map(({ id }) => id)).toEqual(['2']);
 		expect(filterSongs(songs, 'nino', []).map(({ id }) => id)).toEqual(['2']);
 		expect(filterSongs(songs, 'CUNÁ', []).map(({ id }) => id)).toEqual(['1']);
+	});
+});
+
+describe('dónde vale el modo sin conexión', () => {
+	const at = (protocol, hostname) => isOfflineOrigin({ protocol, hostname });
+
+	test('https en un dominio de verdad sí', () => {
+		expect(at('https:', 'oursongs.example.com')).toBe(true);
+		expect(at('https:', '192.168.1.20')).toBe(true);
+	});
+
+	test('http no, ni en producción', () => {
+		expect(at('http:', 'oursongs.example.com')).toBe(false);
+		expect(at('http:', 'localhost')).toBe(false);
+	});
+
+	test('localhost no, ni siquiera con https', () => {
+		expect(at('https:', 'localhost')).toBe(false);
+		expect(at('https:', 'LOCALHOST')).toBe(false);
+		expect(at('https:', 'app.localhost')).toBe(false);
+		expect(at('https:', '127.0.0.1')).toBe(false);
+		expect(at('https:', '[::1]')).toBe(false);
+		expect(at('https:', '::1')).toBe(false);
+		expect(at('https:', '0.0.0.0')).toBe(false);
 	});
 });

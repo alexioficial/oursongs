@@ -16,7 +16,9 @@ export default defineConfig({
 			// Rutas absolutas a /_app: sin conexión el service worker sirve la misma
 			// carcasa (/app-shell) para cualquier URL, y con rutas relativas una
 			// página como /canciones/abc buscaría /canciones/_app/... y no arrancaría.
-			paths: { relative: false }
+			paths: { relative: false },
+			// Lo registra $lib/offline/support solo en https y fuera de localhost.
+			serviceWorker: { register: false }
 		})
 	]
 });

@@ -146,7 +146,7 @@ src/
     types.ts                 DTOs que cruzan al cliente
     client/json.ts           fetch + traducción de `{ error }` a excepción
     client/ids.ts            UUID en el navegador (también sin https)
-    offline/                 modo sin conexión (§4.1): db.ts (IndexedDB),
+    offline/                 modo sin conexión (§4.1): support.ts (activar/limpiar), db.ts (IndexedDB),
                              sync.svelte.ts (estado y sincronización),
                              load.ts (apiGet), songPage.ts (carga de una
                              canción con respaldo local), logic.ts (puro, con tests)
@@ -173,6 +173,16 @@ tests/*.test.mjs             bun:test importando el .ts directamente
 ```
 
 ### 4.1. Sin conexión
+
+**Solo existe en https y fuera de localhost** (`isOfflineOrigin` en `logic.ts`,
+`offlineEnabled()` en `offline/support.ts`). El service worker y IndexedDB son del
+origen, y en `localhost:5173` caben varios proyectos: lo que dejara esta app ahí
+contestaría en los demás. Por eso `serviceWorker.register` está en `false` en
+`vite.config.ts` y `hooks.client.ts` llama a `setupOffline()`: en un origen válido
+registra el worker; en cualquier otro **borra** el worker de esta app, sus cachés
+(`oursongs-*`), la base `oursongs` y el usuario recordado. Sin modo sin conexión,
+`apiGet` deja salir el fallo tal cual y nada toca IndexedDB. Si añades código que
+use la copia local, compruébalo con `offlineEnabled()`.
 
 Cada vez que alguien entra (y cada vez que vuelve la red), `startOffline()` sube
 las canciones creadas sin conexión y descarga el repertorio **entero** a

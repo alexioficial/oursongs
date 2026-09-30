@@ -14,6 +14,7 @@ import { browser } from '$app/environment';
 import { invalidateAll } from '$app/navigation';
 import type { OfflineSong, OfflineSongPage, SessionUser, Song, Tag } from '$lib/types';
 import * as local from './db';
+import { offlineEnabled } from './support';
 import { nowIso, type PendingSong, type PendingSongInput } from './logic';
 
 export type SyncPhase = 'idle' | 'uploading' | 'downloading' | 'done' | 'offline' | 'error';
@@ -56,6 +57,7 @@ class SessionExpired extends Error {
  * borra al cerrar sesión o cuando el servidor dice que no hay sesión.
  */
 export function rememberUser(user: SessionUser | null) {
+	if (!offlineEnabled()) return;
 	try {
 		if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
 		else localStorage.removeItem(USER_KEY);
@@ -65,6 +67,7 @@ export function rememberUser(user: SessionUser | null) {
 }
 
 export function cachedUser(): SessionUser | null {
+	if (!offlineEnabled()) return null;
 	try {
 		const raw = localStorage.getItem(USER_KEY);
 		return raw ? (JSON.parse(raw) as SessionUser) : null;
@@ -82,7 +85,7 @@ function scheduleRetry() {
 
 /** Lo llaman las cargas cuando tiran de la copia local porque el servidor no respondió. */
 export function markUnreachable() {
-	if (!browser) return;
+	if (!offlineEnabled()) return;
 	connection.online = false;
 	// Una carga que falla mientras se sincroniza no pisa la barra: de eso se
 	// encarga la propia sincronización cuando falle.
@@ -91,7 +94,7 @@ export function markUnreachable() {
 }
 
 export function startOffline(user: SessionUser) {
-	if (!browser || userId === user.id) return;
+	if (!offlineEnabled() || userId === user.id) return;
 	const firstStart = userId === null;
 	userId = user.id;
 	if (firstStart) {
