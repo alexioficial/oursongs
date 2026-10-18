@@ -37,12 +37,15 @@ Las notas se guardan de forma dispersa: las posiciones vacías no se serializan,
 pero las filas comparten columnas para que varios números queden alineados. Una
 posición admite como máximo un número. `0` representa una cuerda al aire; `1` a
 `99` son trastes. Los IDs de tablatura son UUID, únicos dentro de la canción, y
-los nombres no pueden repetirse ignorando mayúsculas y espacios exteriores.
+los nombres deben ser no vacíos y no pueden repetirse ignorando mayúsculas y
+espacios exteriores.
 
-Límites iniciales: 20 tablaturas por canción, 1.000 notas por canción, 1.000
-columnas por tablatura y 60 caracteres por nombre. La API mantiene además su
-límite general de 64 KB por petición. Las canciones ya guardadas que no tengan
-el campo se leen con `tabs: []`; no hace falta una migración de MongoDB.
+No se imponen topes de cantidad de tablaturas, notas, columnas ni longitud del
+nombre. El rango de traste `0` a `99` es el único límite numérico de dominio para
+las tablaturas. Se conservan los límites generales ya existentes de tamaño de
+petición (64 KB) y de documento de MongoDB; no son topes por canción. Las
+canciones ya guardadas que no tengan el campo se leen con `tabs: []`; no hace
+falta una migración de MongoDB.
 
 ## Interacción de edición
 
@@ -84,10 +87,15 @@ acción de edición existente y no necesita una ruta independiente para alinear.
 
 `tabs` forma parte del DTO de `Song` y de `SongInput`, del documento Mongo y de
 las operaciones existentes de crear y actualizar canción. El servidor valida
-la lista completa: estructura, límites, UUIDs únicos, nombres no repetidos,
-coordenadas enteras dentro de rango, números entre 0 y 99 y ausencia de dos
-notas en la misma celda. Los fallos corregibles producen `ValidationError` con
-mensajes en español.
+la estructura, UUIDs únicos, nombres no repetidos, cuerda entre 0 y 5,
+coordenadas enteras no negativas, números entre 0 y 99 y ausencia de dos notas
+en la misma celda. No hay topes de cantidad de tablaturas, notas o columnas.
+Los fallos corregibles producen `ValidationError` con mensajes en español.
+
+También se eliminan los topes de cantidad actuales para el catálogo de acordes
+y sus apariciones alineadas. Se mantienen la validación musical y de referencias,
+los límites de texto existentes y los topes generales de tamaño de petición y
+del documento de MongoDB.
 
 El resumen de canciones no incluye las tablaturas, para no cargar datos de
 edición al listar el repertorio. Las cargas de detalle y de canciones sin
@@ -109,8 +117,8 @@ las cuerdas. Una canción sin tablaturas se imprime igual que hoy.
 ## Componentes y responsabilidades
 
 - `src/lib/types.ts`: DTOs de tablatura y notas.
-- `src/lib/validation.ts`: topes compartidos de nombres, tablaturas, columnas,
-  notas y trastes.
+- `src/lib/validation.ts`: límites compartidos de los valores y formatos que sí
+  tienen un tope.
 - `src/lib/server/songs.ts`: normalización y serialización de `tabs`.
 - `src/lib/offline/logic.ts`: persistencia de tablaturas en canciones pendientes
   y representación local.
@@ -137,8 +145,10 @@ los identificadores y nombres de campos van en inglés.
 ## Verificación prevista
 
 La lógica pura cubrirá normalización, validación de rangos, duplicados, nombres,
-y edición de posiciones. La interfaz se revisará con escritura de trastes de una
-y dos cifras, pausa de confirmación, movimiento entre las seis cuerdas,
-expansión horizontal, múltiples tablaturas, temas claro/oscuro, móvil, impresión
-y creación sin conexión. Antes de darlo por terminado se aplicarán los comandos
-de formato, lint, chequeo de tipos, pruebas y build indicados por `AGENTS.md`.
+y edición de posiciones. Se comprobará que el servidor y el formulario ya no
+rechacen acordes ni colocaciones por contar elementos. La interfaz se revisará
+con escritura de trastes de una y dos cifras, pausa de confirmación, movimiento
+entre las seis cuerdas, expansión horizontal, múltiples tablaturas, temas
+claro/oscuro, móvil, impresión y creación sin conexión. Antes de darlo por
+terminado se aplicarán los comandos de formato, lint, chequeo de tipos, pruebas y
+build indicados por `AGENTS.md`.
