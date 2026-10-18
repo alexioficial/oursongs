@@ -35,18 +35,20 @@ export interface TabPart {
 }
 
 export function splitTabColumns(tab: SongTab, columnsPerPart: number): TabPart[] {
-	const notesWidth = tab.notes.reduce((last, note) => Math.max(last, note.column + 1), 0);
-	const totalColumns = Math.max(1, notesWidth);
 	const requestedWidth = Number.isFinite(columnsPerPart) ? Math.floor(columnsPerPart) : 1;
 	const partWidth = Math.max(1, requestedWidth);
-	const parts: TabPart[] = [];
+	if (tab.notes.length === 0) return [{ startColumn: 0, columnCount: 1 }];
 
-	for (let startColumn = 0; startColumn < totalColumns; startColumn += partWidth) {
-		parts.push({
-			startColumn,
-			columnCount: Math.min(partWidth, totalColumns - startColumn)
-		});
+	const columnsByPart = new Map<number, number>();
+	const width = BigInt(partWidth);
+	for (const { column } of tab.notes) {
+		const integerColumn = BigInt(column);
+		const startColumn = Number((integerColumn / width) * width);
+		const columnCount = Number(integerColumn % width) + 1;
+		columnsByPart.set(startColumn, Math.max(columnsByPart.get(startColumn) ?? 0, columnCount));
 	}
 
-	return parts;
+	return [...columnsByPart]
+		.sort(([left], [right]) => left - right)
+		.map(([startColumn, columnCount]) => ({ startColumn, columnCount }));
 }

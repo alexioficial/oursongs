@@ -9,7 +9,6 @@
 	import TablatureView from '$lib/components/TablatureView.svelte';
 	import { ClientApiError, jsonRequest } from '$lib/client/json';
 	import type { Accidentals } from '$lib/music/chords';
-	import { tabColumnCount } from '$lib/music/tablature';
 	import { ACCIDENTAL_PARAMS } from '$lib/print';
 	import {
 		connection,
@@ -172,12 +171,7 @@
 			<h2 id="song-tabs-title" class="section-label">Tablaturas</h2>
 			<div class="tablatures">
 				{#each data.song.tabs as tab (tab.id)}
-					<TablatureView
-						{tab}
-						startColumn={0}
-						columnCount={tabColumnCount(tab, null)}
-						printable={false}
-					/>
+					<TablatureView {tab} startColumn={0} printable={false} />
 				{/each}
 			</div>
 		</section>

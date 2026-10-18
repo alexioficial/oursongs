@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy, tick } from 'svelte';
 	import { createId } from '$lib/client/ids';
-	import { nextTabName, removeTabNote, setTabNote, tabColumnCount } from '$lib/music/tablature';
+	import { nextTabName, removeTabNote, setTabNote } from '$lib/music/tablature';
 	import type { SongTab, TabNote } from '$lib/types';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import Icon from './Icon.svelte';
@@ -18,10 +18,14 @@
 		digit: string;
 	}
 
+	const VISIBLE_COLUMNS = 24;
+
 	let { tabs = $bindable(), disabled = false }: Props = $props();
 	let selectedTabId = $state<string | null>(null);
 	let selectedString = $state(0);
 	let selectedColumn = $state(0);
+	let windowStartColumn = $state(0);
+	let jumpColumn = $state('1');
 	let pendingEntry = $state<PendingEntry | null>(null);
 	let confirmingDelete = $state(false);
 	let gridElement = $state<HTMLDivElement>();
@@ -30,7 +34,12 @@
 
 	const activeTab = $derived(tabs.find(({ id }) => id === selectedTabId) ?? tabs[0] ?? null);
 	const columns = $derived(
-		Array.from({ length: activeTab ? tabColumnCount(activeTab, selectedColumn) : 1 }, (_, i) => i)
+		Array.from(
+			{
+				length: Math.min(VISIBLE_COLUMNS, Number.MAX_SAFE_INTEGER - windowStartColumn + 1)
+			},
+			(_, index) => windowStartColumn + index
+		)
 	);
 	const notesByCell = $derived.by(() =>
 		Object.fromEntries(
@@ -48,22 +57,23 @@
 		tabs = tabs.map((tab) => (tab.id === tabId ? update(tab) : tab));
 	}
 
-	function commitEntry(entry: PendingEntry, advance: boolean) {
+	function commitEntry(entry: PendingEntry, advance: boolean, focusGrid = true) {
 		updateTab(entry.tabId, (tab) =>
 			setTabNote(tab, { string: entry.string, column: entry.column, fret: Number(entry.digit) })
 		);
 		if (advance && activeTab?.id === entry.tabId) {
 			selectedString = entry.string;
 			selectedColumn = Math.min(Number.MAX_SAFE_INTEGER, entry.column + 1);
+			void keepSelectionVisible(focusGrid);
 		}
 	}
 
-	function confirmPending(advance: boolean) {
+	function confirmPending(advance: boolean, focusGrid = true) {
 		const entry = pendingEntry;
 		if (!entry) return;
 		clearEntryTimer();
 		pendingEntry = null;
-		commitEntry(entry, advance);
+		commitEntry(entry, advance, focusGrid);
 	}
 
 	function scheduleEntry(entry: PendingEntry) {
@@ -71,7 +81,12 @@
 		clearEntryTimer();
 		const generation = entryGeneration;
 		entryTimer = setTimeout(() => {
-			if (generation === entryGeneration && pendingEntry) confirmPending(true);
+			if (generation === entryGeneration && pendingEntry) {
+				const mobileInputFocused =
+					document.activeElement instanceof HTMLInputElement &&
+					document.activeElement.classList.contains('fret-input');
+				confirmPending(true, !mobileInputFocused);
+			}
 		}, 500);
 	}
 
@@ -99,9 +114,10 @@
 		});
 	}
 
-	async function keepSelectionVisible() {
+	async function keepSelectionVisible(focusGrid = true) {
+		windowStartColumn = Math.floor(selectedColumn / VISIBLE_COLUMNS) * VISIBLE_COLUMNS;
 		await tick();
-		gridElement?.focus({ preventScroll: true });
+		if (focusGrid) gridElement?.focus({ preventScroll: true });
 		gridElement?.querySelector<HTMLButtonElement>('.cell.selected')?.scrollIntoView({
 			block: 'nearest',
 			inline: 'nearest'
@@ -110,10 +126,74 @@
 
 	function selectCell(string: number, column: number) {
 		confirmPending(false);
-		const isTrailingCell = column === columns.length - 1 && !notesByCell[`${string}:${column}`];
+		const isTrailingCell =
+			column === windowStartColumn + columns.length - 1 && !notesByCell[`${string}:${column}`];
 		selectedString = string;
-		selectedColumn = isTrailingCell ? column + 1 : column;
+		selectedColumn = isTrailingCell ? Math.min(Number.MAX_SAFE_INTEGER, column + 1) : column;
 		void keepSelectionVisible();
+	}
+
+	function moveWindow(direction: -1 | 1) {
+		const nextColumn = Math.max(
+			0,
+			Math.min(Number.MAX_SAFE_INTEGER, windowStartColumn + direction * VISIBLE_COLUMNS)
+		);
+		selectedColumn = nextColumn;
+		jumpColumn = String(nextColumn + 1);
+		void keepSelectionVisible();
+	}
+
+	function goToColumn(event: SubmitEvent) {
+		event.preventDefault();
+		const requestedColumn = Number(jumpColumn);
+		if (
+			!Number.isInteger(requestedColumn) ||
+			requestedColumn < 1 ||
+			requestedColumn > Number.MAX_SAFE_INTEGER + 1
+		) {
+			return;
+		}
+		selectedColumn = requestedColumn - 1;
+		void keepSelectionVisible();
+	}
+
+	function enterMobileFret(value: string, input: HTMLInputElement) {
+		const digit = value.replace(/[^0-9]/g, '').slice(0, 2);
+		if (input.value !== digit) input.value = digit;
+		if (digit.length === 0) {
+			clearEntryTimer();
+			pendingEntry = null;
+			return;
+		}
+		if (digit.length === 1) {
+			enterDigit(digit);
+			return;
+		}
+
+		const entry = {
+			tabId: activeTab?.id ?? '',
+			string: selectedString,
+			column: selectedColumn,
+			digit
+		};
+		if (
+			pendingEntry?.tabId === entry.tabId &&
+			pendingEntry.string === entry.string &&
+			pendingEntry.column === entry.column
+		) {
+			clearEntryTimer();
+			pendingEntry = null;
+		} else {
+			confirmPending(false, false);
+		}
+		if (activeTab && !disabled) commitEntry(entry, true, false);
+	}
+
+	function deleteSelectedNote() {
+		if (!activeTab || disabled) return;
+		clearEntryTimer();
+		pendingEntry = null;
+		updateTab(activeTab.id, (tab) => removeTabNote(tab, selectedString, selectedColumn));
 	}
 
 	function handleGridKeydown(event: KeyboardEvent) {
@@ -126,11 +206,7 @@
 
 		if (event.key === 'Backspace' || event.key === 'Delete') {
 			event.preventDefault();
-			clearEntryTimer();
-			pendingEntry = null;
-			if (activeTab) {
-				updateTab(activeTab.id, (tab) => removeTabNote(tab, selectedString, selectedColumn));
-			}
+			deleteSelectedNote();
 			return;
 		}
 
@@ -156,11 +232,17 @@
 		selectedTabId = id;
 		selectedString = 0;
 		selectedColumn = 0;
+		windowStartColumn = 0;
+		jumpColumn = '1';
 	}
 
 	function selectTab(tabId: string) {
 		confirmPending(false);
 		selectedTabId = tabId;
+		selectedString = 0;
+		selectedColumn = 0;
+		windowStartColumn = 0;
+		jumpColumn = '1';
 		void tick().then(() => gridElement?.focus({ preventScroll: true }));
 	}
 
@@ -176,6 +258,8 @@
 		selectedTabId = remaining[0]?.id ?? null;
 		selectedString = 0;
 		selectedColumn = 0;
+		windowStartColumn = 0;
+		jumpColumn = '1';
 		confirmingDelete = false;
 	}
 
@@ -232,6 +316,40 @@
 		<p class="hint instructions">
 			Elige una celda y escribe el traste. Las flechas mueven la selección; Suprimir borra una nota.
 		</p>
+		<div class="column-navigation" role="group" aria-label="Navegación de columnas">
+			<button
+				type="button"
+				class="btn btn-ghost"
+				disabled={disabled || windowStartColumn === 0}
+				onclick={() => moveWindow(-1)}
+			>
+				Anterior
+			</button>
+			<span class="column-range" aria-live="polite">
+				Columnas {windowStartColumn + 1}–{windowStartColumn + columns.length}
+			</span>
+			<button
+				type="button"
+				class="btn btn-ghost"
+				disabled={disabled || windowStartColumn + VISIBLE_COLUMNS > Number.MAX_SAFE_INTEGER}
+				onclick={() => moveWindow(1)}
+			>
+				Siguiente
+			</button>
+			<form class="jump-form" onsubmit={goToColumn}>
+				<label for="tab-column-jump">Ir a columna</label>
+				<input
+					id="tab-column-jump"
+					class="input"
+					type="number"
+					min="1"
+					step="1"
+					bind:value={jumpColumn}
+					{disabled}
+				/>
+				<button type="submit" class="btn btn-subtle" {disabled}>Ir</button>
+			</form>
+		</div>
 		<div class="grid-scroll">
 			<div
 				id="song-tab-panel"
@@ -239,14 +357,17 @@
 				role="grid"
 				aria-label={`Editor de ${activeTab.name || 'tablatura'}`}
 				aria-rowcount="7"
-				aria-colcount={columns.length + 1}
+				aria-colcount={-1}
 				aria-labelledby={`song-tab-${activeTab.id}`}
 				aria-activedescendant={`tab-cell-${activeTab.id}-${selectedString}-${selectedColumn}`}
 				tabindex="0"
 				bind:this={gridElement}
 				onkeydown={handleGridKeydown}
 				onfocusout={(event) => {
-					if (!gridElement?.contains(event.relatedTarget as Node | null)) confirmPending(false);
+					const target = event.relatedTarget;
+					if (!(target instanceof HTMLInputElement && target.classList.contains('fret-input'))) {
+						confirmPending(false, false);
+					}
 				}}
 			>
 				<div
@@ -277,6 +398,7 @@
 								id={`tab-cell-${activeTab.id}-${string}-${column}`}
 								role="gridcell"
 								aria-selected={selectedString === string && selectedColumn === column}
+								aria-colindex={column + 2}
 								aria-label={`Cuerda ${string + 1}, columna ${column + 1}, ${note ? `traste ${note.fret}` : 'vacía'}`}
 								tabindex="-1"
 								{disabled}
@@ -288,6 +410,30 @@
 					</div>
 				{/each}
 			</div>
+		</div>
+		<div class="fret-entry">
+			<label class="label" for={`tab-fret-entry-${activeTab.id}`}>
+				Traste · cuerda {selectedString + 1}, columna {selectedColumn + 1}
+			</label>
+			<input
+				id={`tab-fret-entry-${activeTab.id}`}
+				class="input fret-input"
+				type="text"
+				inputmode="numeric"
+				pattern="[0-9]*"
+				maxlength="2"
+				value={pendingEntry?.digit ?? ''}
+				{disabled}
+				oninput={(event) => enterMobileFret(event.currentTarget.value, event.currentTarget)}
+			/>
+			<button
+				type="button"
+				class="btn btn-danger"
+				disabled={disabled || !notesByCell[`${selectedString}:${selectedColumn}`]}
+				onclick={deleteSelectedNote}
+			>
+				Borrar nota
+			</button>
 		</div>
 		{#if pendingEntry}
 			<p class="pending-note" aria-live="polite">Traste {pendingEntry.digit}…</p>
@@ -363,6 +509,39 @@
 		border-radius: var(--radius-control);
 		background: var(--color-surface);
 		scrollbar-color: var(--color-border) transparent;
+	}
+	.column-navigation {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+	.column-range {
+		color: var(--color-subtle);
+		font-size: 0.8rem;
+		font-variant-numeric: tabular-nums;
+	}
+	.jump-form {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		margin-left: auto;
+	}
+	.jump-form label {
+		color: var(--color-subtle);
+		font-size: 0.8rem;
+	}
+	.jump-form input {
+		width: 6rem;
+	}
+	.fret-entry {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(5rem, 8rem) auto;
+		align-items: center;
+		gap: 0.75rem;
+	}
+	.fret-entry .label {
+		margin: 0;
 	}
 	.tab-grid {
 		width: max-content;
@@ -441,6 +620,22 @@
 		.toolbar > .btn,
 		.tab-settings > .btn {
 			width: 100%;
+		}
+		.fret-entry {
+			grid-template-columns: minmax(0, 1fr) auto;
+		}
+		.fret-entry .label {
+			grid-column: 1 / -1;
+		}
+		.column-navigation > button {
+			flex: 1;
+		}
+		.jump-form {
+			width: 100%;
+			margin-left: 0;
+		}
+		.jump-form input {
+			flex: 1;
 		}
 	}
 </style>

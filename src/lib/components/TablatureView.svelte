@@ -4,29 +4,54 @@
 	interface Props {
 		tab: SongTab;
 		startColumn: number;
-		columnCount: number;
+		columnCount?: number;
 		printable: boolean;
 	}
 
-	let { tab, startColumn, columnCount, printable }: Props = $props();
-	const columns = $derived(Array.from({ length: Math.max(1, columnCount) }, (_, index) => index));
+	const PAGE_SIZE = 12;
+	const MAX_COLUMN = Number.MAX_SAFE_INTEGER;
+
+	let { tab, startColumn, columnCount = 1, printable }: Props = $props();
+	let pageStartColumn = $state(0);
+	let requestedColumn = $state('1');
+	const visibleStartColumn = $derived(printable ? startColumn : pageStartColumn);
+	const visibleColumnCount = $derived(
+		printable ? Math.max(1, columnCount) : Math.min(PAGE_SIZE, MAX_COLUMN - visibleStartColumn + 1)
+	);
+	const columns = $derived(Array.from({ length: visibleColumnCount }, (_, index) => index));
 	const visibleNotes = $derived(
 		tab.notes.filter(
-			(note) => note.column >= startColumn && note.column < startColumn + columnCount
+			(note) =>
+				note.column >= visibleStartColumn && note.column < visibleStartColumn + visibleColumnCount
 		)
 	);
+	const pageEndColumn = $derived(visibleStartColumn + visibleColumnCount - 1);
 	const notesByCell = $derived.by(() =>
 		Object.fromEntries(
-			visibleNotes.map((note) => [`${note.string}:${note.column - startColumn}`, note])
+			visibleNotes.map((note) => [`${note.string}:${note.column - visibleStartColumn}`, note])
 		)
 	);
+
+	function movePage(direction: -1 | 1) {
+		pageStartColumn = Math.max(0, Math.min(MAX_COLUMN, pageStartColumn + direction * PAGE_SIZE));
+		requestedColumn = String(pageStartColumn + 1);
+	}
+
+	function goToColumn(event: SubmitEvent) {
+		event.preventDefault();
+		const columnNumber = Number(requestedColumn);
+		if (!Number.isInteger(columnNumber) || columnNumber < 1 || columnNumber > MAX_COLUMN + 1) {
+			return;
+		}
+		pageStartColumn = Math.floor((columnNumber - 1) / PAGE_SIZE) * PAGE_SIZE;
+	}
 </script>
 
 <section
 	class="tab-view"
 	class:printable
 	aria-label={`Tablatura ${tab.name}${startColumn > 0 ? ', continuación' : ''}`}
-	style:--columns={Math.max(1, columnCount)}
+	style:--columns={visibleColumnCount}
 	style:--column-size={printable ? '3ch' : '2.75rem'}
 	style:--tab-foreground={printable ? 'var(--lyrics-color)' : 'var(--color-text)'}
 	style:--tab-line={printable ? 'var(--lyrics-color)' : 'var(--color-border-strong)'}
@@ -35,6 +60,41 @@
 	<h3 class="tab-title">
 		{tab.name}{#if startColumn > 0}<span class="continuation"> · continuación</span>{/if}
 	</h3>
+	{#if !printable}
+		<div class="page-navigation" role="group" aria-label="Navegación de columnas">
+			<button
+				type="button"
+				class="btn btn-ghost"
+				disabled={pageStartColumn === 0}
+				onclick={() => movePage(-1)}
+			>
+				Anterior
+			</button>
+			<span aria-live="polite">Columnas {visibleStartColumn + 1}–{pageEndColumn + 1}</span>
+			<button
+				type="button"
+				class="btn btn-ghost"
+				disabled={pageStartColumn + PAGE_SIZE > MAX_COLUMN}
+				onclick={() => movePage(1)}
+			>
+				Siguiente
+			</button>
+			<form onsubmit={goToColumn}>
+				<label for={`tab-view-jump-${tab.id}`}>Ir a columna</label>
+				<input
+					id={`tab-view-jump-${tab.id}`}
+					class="input"
+					type="number"
+					min="1"
+					step="1"
+					bind:value={requestedColumn}
+				/>
+				<button type="submit" class="btn btn-subtle">Ir</button>
+			</form>
+		</div>
+	{:else}
+		<p class="column-range">Columnas {visibleStartColumn + 1}–{pageEndColumn + 1}</p>
+	{/if}
 	{#if visibleNotes.length > 0}
 		<ul class="visually-hidden">
 			{#each [0, 1, 2, 3, 4, 5] as string (string)}
@@ -95,6 +155,35 @@
 		line-height: 1.3;
 		overflow-wrap: anywhere;
 	}
+	.page-navigation {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+		margin-bottom: 0.75rem;
+		color: var(--color-subtle);
+		font-size: 0.8rem;
+		font-variant-numeric: tabular-nums;
+	}
+	.page-navigation form {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		margin-left: auto;
+	}
+	.page-navigation label {
+		color: var(--color-subtle);
+		font-size: 0.8rem;
+	}
+	.page-navigation input {
+		width: 6rem;
+	}
+	.column-range {
+		margin: 0 0 0.5rem;
+		color: var(--tab-foreground, var(--color-subtle));
+		font-size: 0.75em;
+		font-variant-numeric: tabular-nums;
+	}
 	.continuation {
 		font-weight: 400;
 	}
@@ -143,19 +232,19 @@
 		white-space: nowrap;
 		border: 0;
 	}
+	.tab-view.printable .tab-title {
+		margin-bottom: 0.5em;
+		font-size: 0.85em;
+	}
+	.tab-view.printable .string-line {
+		min-height: 1.45em;
+	}
+	.tab-view.printable .fret {
+		font-size: 0.8em;
+	}
 	@media print {
-		.tab-title {
-			margin-bottom: 0.5em;
-			font-size: 0.85em;
-		}
 		.line-scroll {
 			overflow: visible;
-		}
-		.string-line {
-			min-height: 1.45em;
-		}
-		.fret {
-			font-size: 0.8em;
 		}
 	}
 </style>
