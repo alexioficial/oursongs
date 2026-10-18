@@ -2,6 +2,7 @@ import { ObjectId, type Db, type Filter } from 'mongodb';
 import { getDb } from './db';
 import { NotFoundError, ValidationError } from './errors';
 import { normalizeSongChordState } from './songChords';
+import { normalizeSongTabs } from './songTabs';
 import { resolveTagIds, toTagId } from './tags';
 import { isDuplicateKeyError } from './users';
 import {
@@ -12,7 +13,7 @@ import {
 	UUID_REGEX
 } from '$lib/validation';
 import { accentInsensitivePattern } from '$lib/search';
-import type { ChordPlacement, Song, SongChord, SongInput, SongSummary } from '$lib/types';
+import type { ChordPlacement, Song, SongChord, SongInput, SongSummary, SongTab } from '$lib/types';
 
 const SONGS_COLLECTION = 'songs';
 
@@ -28,6 +29,8 @@ export interface SongDoc {
 	chords: SongChord[];
 	/** Apariciones alineadas por offset con la letra. */
 	chordPlacements: ChordPlacement[];
+	/** Tablaturas independientes, opcionales en documentos anteriores al campo. */
+	tabs?: SongTab[];
 	tagIds: ObjectId[];
 	/**
 	 * Id que puso el cliente al crearla. Una canción creada sin conexión se sube
@@ -44,7 +47,7 @@ export interface SongDoc {
 /** Lo que necesita la lista: sin la letra, que es lo único que abulta. */
 type SongSummaryDoc = Omit<
 	SongDoc,
-	'lyrics' | 'chordPlacements' | 'createdAt' | 'createdBy' | 'updatedBy'
+	'lyrics' | 'chordPlacements' | 'tabs' | 'createdAt' | 'createdBy' | 'updatedBy'
 >;
 
 const SUMMARY_PROJECTION = {
@@ -73,6 +76,10 @@ export function toSong(doc: SongDoc): Song {
 		...toSongSummary(doc),
 		lyrics: doc.lyrics ?? '',
 		chordPlacements: (doc.chordPlacements ?? []).map((placement) => ({ ...placement })),
+		tabs: (doc.tabs ?? []).map((tab) => ({
+			...tab,
+			notes: tab.notes.map((note) => ({ ...note }))
+		})),
 		createdAt: doc.createdAt.toISOString(),
 		createdBy: doc.createdBy.toString(),
 		...(doc.updatedBy && { updatedBy: doc.updatedBy.toString() })
@@ -193,6 +200,7 @@ export async function createSong(input: SongInput, userId: ObjectId): Promise<So
 		chords: input.chords,
 		chordPlacements: input.chordPlacements
 	});
+	const tabs = normalizeSongTabs(input.tabs);
 	const doc = {
 		title: normalizeTitle(input.title),
 		...(artist && { artist }),
@@ -200,6 +208,7 @@ export async function createSong(input: SongInput, userId: ObjectId): Promise<So
 		lyrics,
 		chords,
 		chordPlacements,
+		tabs,
 		tagIds: await resolveTagIds(input.tagIds),
 		...(clientId && { clientId }),
 		createdBy: userId,
@@ -295,6 +304,7 @@ export async function updateSong(id: string, patch: SongInput, userId: ObjectId)
 	if (patch.chordPlacements !== undefined) {
 		set.chordPlacements = chordState.chordPlacements;
 	}
+	if (patch.tabs !== undefined) set.tabs = normalizeSongTabs(patch.tabs, current.tabs ?? []);
 	if (patch.tagIds !== undefined) set.tagIds = await resolveTagIds(patch.tagIds);
 
 	if (Object.keys(set).length === 0 && Object.keys(unset).length === 0) {

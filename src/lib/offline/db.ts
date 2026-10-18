@@ -64,7 +64,10 @@ async function readOne<T>(store: StoreName, key: string): Promise<T | undefined>
 }
 
 export const readSongs = () => readAll<OfflineSong>(SONGS);
-export const readSong = (id: string) => readOne<OfflineSong>(SONGS, id);
+export async function readSong(id: string): Promise<OfflineSong | undefined> {
+	const song = await readOne<OfflineSong>(SONGS, id);
+	return song ? { ...song, tabs: song.tabs ?? [] } : undefined;
+}
 export const readTags = () => readAll<Tag>(TAGS);
 export const readPending = () => readAll<PendingSong>(PENDING);
 export const readPendingSong = (clientId: string) => readOne<PendingSong>(PENDING, clientId);

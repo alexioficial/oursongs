@@ -30,6 +30,18 @@ export interface SongChordInput {
 	value?: unknown;
 }
 
+export interface TabNote {
+	string: number;
+	column: number;
+	fret: number;
+}
+
+export interface SongTab {
+	id: string;
+	name: string;
+	notes: TabNote[];
+}
+
 export interface ChordPlacement {
 	chordId: string;
 	offset: number;
@@ -49,6 +61,7 @@ export interface SongSummary {
 export interface Song extends SongSummary {
 	lyrics: string;
 	chordPlacements: ChordPlacement[];
+	tabs: SongTab[];
 	createdAt: string;
 	createdBy: string;
 	updatedBy?: string;
@@ -66,6 +79,7 @@ export interface SongInput {
 	lyrics?: unknown;
 	chords?: unknown;
 	chordPlacements?: unknown;
+	tabs?: unknown;
 	tagIds?: unknown;
 	/** UUID del cliente: repetir el alta con el mismo no crea otra canción. */
 	clientId?: unknown;

@@ -2,7 +2,6 @@
 	import Icon from './Icon.svelte';
 	import { chordCatalogProblems } from '$lib/music/chordCatalog';
 	import { isValidChord, normalizeChord } from '$lib/music/chords';
-	import { MAX_CHORDS_PER_SONG } from '$lib/validation';
 	import type { SongChordInput } from '$lib/types';
 
 	interface Props {
@@ -34,10 +33,6 @@
 			)
 		) {
 			addError = 'Ese acorde ya está en el catálogo';
-			return;
-		}
-		if (chords.length >= MAX_CHORDS_PER_SONG) {
-			addError = `No se pueden registrar más de ${MAX_CHORDS_PER_SONG} acordes`;
 			return;
 		}
 		chords = [...chords, { value: normalized }];

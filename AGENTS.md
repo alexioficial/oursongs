@@ -326,7 +326,7 @@ normalizador (`normalizeTitle`, `normalizeChordCatalog`…) decide. Los límites
 avise de lo mismo que rechaza el servidor:
 
 `username` 3-20 caracteres · contraseña 8-200 · nombre 60 · título y artista 120 · ritmo 60 (texto libre) ·
-letra 20 000 · nombre de tag 40 · 200 acordes por canción · cuerpo JSON 64 KB.
+letra 20 000 · nombre de tag 40 · cuerpo JSON 64 KB.
 
 Errores: lanza `ValidationError` (400), `ConflictError` (409) o `NotFoundError`
 (404) de `$lib/server/errors.ts`. **Un `Error` pelado sale como 500 genérico** y

@@ -4,6 +4,7 @@
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import Icon from './Icon.svelte';
 	import TagPicker from './TagPicker.svelte';
+	import TablatureEditor from './TablatureEditor.svelte';
 	import { createId } from '$lib/client/ids';
 	import { ClientApiError, jsonRequest } from '$lib/client/json';
 	import { chordCatalogProblems } from '$lib/music/chordCatalog';
@@ -20,12 +21,10 @@
 	import {
 		ARTIST_MAX_LENGTH,
 		LYRICS_MAX_LENGTH,
-		MAX_CHORD_PLACEMENTS_PER_SONG,
-		MAX_CHORDS_PER_SONG,
 		RHYTHM_MAX_LENGTH,
 		TITLE_MAX_LENGTH
 	} from '$lib/validation';
-	import type { ChordPlacement, Song, SongChordInput, Tag } from '$lib/types';
+	import type { ChordPlacement, Song, SongChordInput, SongTab, Tag } from '$lib/types';
 
 	interface Props {
 		/** Sin canción, el formulario crea una nueva. */
@@ -47,6 +46,15 @@
 	let lyrics = $state(untrack(() => song?.lyrics ?? ''));
 	let chordPlacements = $state<ChordPlacement[]>(
 		untrack(() => song?.chordPlacements.map((placement) => ({ ...placement })) ?? [])
+	);
+	let tabs = $state<SongTab[]>(
+		untrack(
+			() =>
+				song?.tabs?.map((tab) => ({
+					...tab,
+					notes: tab.notes.map((note) => ({ ...note }))
+				})) ?? []
+		)
 	);
 	let selectedTagIds = $state<string[]>(untrack(() => [...(song?.tagIds ?? [])]));
 	// Id propio de la canción nueva: si la red se cae a mitad del guardado, el
@@ -87,6 +95,15 @@
 
 	const chordProblems = $derived(chordCatalogProblems(chords));
 	const assignedIds = $derived(chordPlacements.map(({ chordId }) => chordId));
+	const tabNamesValid = $derived(
+		tabs.every((tab, index) => {
+			const name = tab.name.trim().toLowerCase();
+			return (
+				Boolean(name) &&
+				!tabs.slice(0, index).some((previous) => previous.name.trim().toLowerCase() === name)
+			);
+		})
+	);
 
 	function updateLyrics(event: Event) {
 		const nextLyrics = (event.currentTarget as HTMLTextAreaElement).value;
@@ -124,11 +141,7 @@
 		);
 		// Pasarse de algún límite haría fallar el guardado entero: mejor pegar el
 		// texto sin más y que el usuario decida.
-		if (
-			result.lyrics.length > LYRICS_MAX_LENGTH ||
-			result.chords.length > MAX_CHORDS_PER_SONG ||
-			result.placements.length > MAX_CHORD_PLACEMENTS_PER_SONG
-		) {
+		if (result.lyrics.length > LYRICS_MAX_LENGTH) {
 			return;
 		}
 
@@ -192,6 +205,10 @@
 			error = 'Corrige los acordes marcados antes de guardar';
 			return;
 		}
+		if (!tabNamesValid) {
+			error = 'Escribe un nombre distinto para cada tablatura';
+			return;
+		}
 
 		if (song && !connection.online) {
 			error = 'Sin conexión: los cambios necesitan internet';
@@ -208,6 +225,11 @@
 			lyrics: trimmed.lyrics,
 			chords,
 			chordPlacements: trimmed.placements,
+			tabs: tabs.map((tab) => ({
+				...tab,
+				name: tab.name.trim(),
+				notes: tab.notes.map((note) => ({ ...note }))
+			})),
 			tagIds: selectedTagIds
 		};
 
@@ -317,6 +339,14 @@
 				La letra cambió alrededor de un acorde. Revisa su alineación cuando guardes.
 			</p>
 		{/if}
+	</div>
+
+	<div class="field">
+		<span class="label">Tablaturas</span>
+		<TablatureEditor bind:tabs disabled={saving} />
+		<p class="hint">
+			Registra una o varias tablaturas por separado; no se alinean con la letra ni los acordes.
+		</p>
 	</div>
 
 	{#if error}<p class="error-text">{error}</p>{/if}

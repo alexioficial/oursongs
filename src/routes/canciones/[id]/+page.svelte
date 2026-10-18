@@ -6,8 +6,10 @@
 	import ChordLyrics from '$lib/components/ChordLyrics.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import SongForm from '$lib/components/SongForm.svelte';
+	import TablatureView from '$lib/components/TablatureView.svelte';
 	import { ClientApiError, jsonRequest } from '$lib/client/json';
 	import type { Accidentals } from '$lib/music/chords';
+	import { tabColumnCount } from '$lib/music/tablature';
 	import { ACCIDENTAL_PARAMS } from '$lib/print';
 	import {
 		connection,
@@ -165,6 +167,21 @@
 		bind:semitones
 		bind:accidentals
 	/>
+	{#if data.song.tabs.length > 0}
+		<section class="section tab-section" aria-labelledby="song-tabs-title">
+			<h2 id="song-tabs-title" class="section-label">Tablaturas</h2>
+			<div class="tablatures">
+				{#each data.song.tabs as tab (tab.id)}
+					<TablatureView
+						{tab}
+						startColumn={0}
+						columnCount={tabColumnCount(tab, null)}
+						printable={false}
+					/>
+				{/each}
+			</div>
+		</section>
+	{/if}
 
 	{#if !data.pending}
 		<p class="meta muted">
@@ -229,5 +246,9 @@
 		padding-top: 1rem;
 		border-top: 1px solid var(--color-border-soft);
 		font-size: 0.78rem;
+	}
+	.tablatures {
+		display: grid;
+		gap: 0.875rem;
 	}
 </style>

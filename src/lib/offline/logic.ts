@@ -4,7 +4,14 @@
  */
 import { normalizeChord } from '../music/chords';
 import { searchKey } from '../search';
-import type { ChordPlacement, Song, SongChord, SongChordInput, SongSummary } from '../types';
+import type {
+	ChordPlacement,
+	Song,
+	SongChord,
+	SongChordInput,
+	SongSummary,
+	SongTab
+} from '../types';
 
 /** Lo que se manda al crear, ya con un id por acorde. */
 export interface PendingSongInput {
@@ -14,6 +21,8 @@ export interface PendingSongInput {
 	lyrics: string;
 	chords: SongChord[];
 	chordPlacements: ChordPlacement[];
+	/** Opcional para leer canciones pendientes guardadas antes de las tablaturas. */
+	tabs?: SongTab[];
 	tagIds: string[];
 }
 
@@ -76,6 +85,7 @@ export function pendingToSong(pending: PendingSong): Song {
 		lyrics: input.lyrics,
 		chords: input.chords.map(({ id, value }) => ({ id, value: normalizeChord(value) })),
 		chordPlacements: input.chordPlacements,
+		tabs: input.tabs ?? [],
 		tagIds: input.tagIds,
 		createdAt: pending.createdAt,
 		updatedAt: pending.createdAt,

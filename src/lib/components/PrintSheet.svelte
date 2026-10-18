@@ -2,6 +2,7 @@
 	import { packChordRows, placementsForLine, splitLyricLines } from '$lib/music/chordPlacements';
 	import { transposeChords, type Accidentals } from '$lib/music/chords';
 	import { chordRowText, wrapChordLine } from '$lib/music/printLayout';
+	import { splitTabColumns } from '$lib/music/tablature';
 	import {
 		COLUMN_GAP,
 		LYRICS_FONT_PT,
@@ -11,6 +12,7 @@
 		type PrintSettings
 	} from '$lib/print';
 	import type { Song, Tag } from '$lib/types';
+	import TablatureView from './TablatureView.svelte';
 
 	interface Props {
 		song: Song;
@@ -26,6 +28,7 @@
 	let { song, tags, settings, semitones, accidentals, capacity }: Props = $props();
 
 	const paper = $derived(PAPERS[settings.paper]);
+	const tabColumnsPerPart = $derived(Math.max(1, Math.floor(capacity / 3)));
 
 	// La escritura (♯/♭) se decide para la canción entera, como en la ficha.
 	const chordById = $derived.by(() => {
@@ -122,6 +125,20 @@
 	{:else}
 		<p class="empty">Esta canción todavía no tiene letra.</p>
 	{/if}
+	{#if song.tabs.length > 0}
+		<div class="print-tabs">
+			{#each song.tabs as tab (tab.id)}
+				{#each splitTabColumns(tab, tabColumnsPerPart) as part (part.startColumn)}
+					<TablatureView
+						{tab}
+						startColumn={part.startColumn}
+						columnCount={part.columnCount}
+						printable={true}
+					/>
+				{/each}
+			{/each}
+		</div>
+	{/if}
 </article>
 
 <style>
@@ -214,6 +231,14 @@
 		margin: 0;
 		color: #5f6368;
 		font-size: var(--font-size);
+	}
+	.print-tabs {
+		display: grid;
+		gap: 1.25em;
+		margin-top: 1.25em;
+		font-family: var(--font-mono);
+		font-size: var(--font-size);
+		line-height: 1.2;
 	}
 
 	/* En el papel los márgenes los pone `@page` (ver la pantalla de imprimir). */
