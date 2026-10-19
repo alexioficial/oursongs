@@ -11,11 +11,12 @@
 		PAPERS,
 		type PrintSettings
 	} from '$lib/print';
-	import type { Song, Tag } from '$lib/types';
+	import type { Song, SongTab, Tag } from '$lib/types';
 	import TablatureView from './TablatureView.svelte';
 
 	interface Props {
 		song: Song;
+		tabs: SongTab[];
 		/** Los tags de la canción, ya resueltos. */
 		tags: Tag[];
 		settings: PrintSettings;
@@ -25,7 +26,7 @@
 		capacity: number;
 	}
 
-	let { song, tags, settings, semitones, accidentals, capacity }: Props = $props();
+	let { song, tabs, tags, settings, semitones, accidentals, capacity }: Props = $props();
 
 	const paper = $derived(PAPERS[settings.paper]);
 	const tabColumnsPerPart = $derived(Math.max(1, Math.floor(capacity / 3)));
@@ -125,9 +126,9 @@
 	{:else}
 		<p class="empty">Esta canción todavía no tiene letra.</p>
 	{/if}
-	{#if song.tabs.length > 0}
+	{#if tabs.length > 0}
 		<div class="print-tabs">
-			{#each song.tabs as tab (tab.id)}
+			{#each tabs as tab (tab.id)}
 				{#each splitTabColumns(tab, tabColumnsPerPart) as part (part.startColumn)}
 					<TablatureView
 						{tab}

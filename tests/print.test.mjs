@@ -5,7 +5,9 @@ import {
 	DEFAULT_PRINT_SETTINGS,
 	isDefaultPrintSettings,
 	parseAccidentalsParam,
-	parsePrintSettings
+	parsePrintSettings,
+	printableTabs,
+	togglePrintableTab
 } from '../src/lib/print.ts';
 
 const chord = (column, label) => ({ chordId: label, offset: column, column, label });
@@ -151,5 +153,31 @@ describe('opciones de impresión', () => {
 		expect(
 			columnCapacity({ ...DEFAULT_PRINT_SETTINGS, paper: 'carta' }, 0.6)
 		).toBeGreaterThanOrEqual(base);
+	});
+});
+
+describe('selección de tablaturas para imprimir', () => {
+	const tabs = [
+		{ id: 'tab-a', name: 'Intro' },
+		{ id: 'tab-b', name: 'Solo' },
+		{ id: 'tab-c', name: 'Final' }
+	];
+
+	test('incluye todas por defecto y no reutiliza la selección de otra canción', () => {
+		const selection = { songId: 'song-a', tabIds: ['tab-c', 'tab-a'] };
+
+		expect(printableTabs('song-a', tabs, null)).toEqual(tabs);
+		expect(printableTabs('song-a', tabs, selection)).toEqual([tabs[0], tabs[2]]);
+		expect(printableTabs('song-b', tabs, selection)).toEqual(tabs);
+	});
+
+	test('alternar una tablatura no cambia las demás y conserva el orden original', () => {
+		const selection = togglePrintableTab('song-a', tabs, null, 'tab-b');
+
+		expect(selection).toEqual({ songId: 'song-a', tabIds: ['tab-a', 'tab-c'] });
+		expect(printableTabs('song-a', tabs, selection)).toEqual([tabs[0], tabs[2]]);
+		expect(
+			printableTabs('song-a', tabs, togglePrintableTab('song-a', tabs, selection, 'tab-b'))
+		).toEqual(tabs);
 	});
 });

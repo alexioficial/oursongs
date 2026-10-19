@@ -21,10 +21,13 @@
 		PAPER_SIZES,
 		PAPERS,
 		PRINT_COLORS,
+		printableTabs,
 		savePrintSettings,
+		togglePrintableTab,
 		TEXT_SCALE_MAX,
 		TEXT_SCALE_MIN,
-		TEXT_SCALE_STEP
+		TEXT_SCALE_STEP,
+		type PrintTabSelection
 	} from '$lib/print';
 	import type { PageData } from './$types';
 
@@ -34,6 +37,9 @@
 	// el dispositivo se puede leer ya, sin pasar antes por las opciones por defecto.
 	const settings = $state(loadPrintSettings());
 	$effect(() => savePrintSettings($state.snapshot(settings)));
+	let tabSelection = $state<PrintTabSelection | null>(null);
+	const activeTabs = $derived(printableTabs(data.song.id, data.song.tabs, tabSelection));
+	const activeTabIds = $derived(activeTabs.map(({ id }) => id));
 
 	// La ficha manda la transposición y la escritura que se estaban viendo: se
 	// imprime eso.
@@ -118,14 +124,22 @@
 		semitones = wrapSemitones(semitones + step);
 	}
 
+	function toggleTab(tabId: string) {
+		tabSelection = togglePrintableTab(data.song.id, data.song.tabs, tabSelection, tabId);
+	}
+
 	const isDefault = $derived(
-		isDefaultPrintSettings(settings) && semitones === 0 && accidentals === 'auto'
+		isDefaultPrintSettings(settings) &&
+			semitones === 0 &&
+			accidentals === 'auto' &&
+			activeTabs.length === data.song.tabs.length
 	);
 
 	function reset() {
 		Object.assign(settings, DEFAULT_PRINT_SETTINGS);
 		semitones = 0;
 		accidentals = 'auto';
+		tabSelection = null;
 		open = null;
 	}
 
@@ -370,6 +384,38 @@
 			</button>
 		</div>
 
+		{#if data.song.tabs.length > 0}
+			<div class="group tab-group" role="group" aria-labelledby="print-tabs-title">
+				<div class="tab-heading">
+					<div>
+						<h2 id="print-tabs-title">Tablaturas</h2>
+						<p>Se añaden al final de la hoja.</p>
+					</div>
+					<span class="tab-count" aria-live="polite">
+						<strong>{activeTabs.length}</strong> de {data.song.tabs.length} activas
+					</span>
+				</div>
+				<div class="tab-list">
+					{#each data.song.tabs as tab (tab.id)}
+						<label
+							class="tab-choice"
+							class:tab-active={activeTabIds.includes(tab.id)}
+							title={tab.name}
+						>
+							<span class="tab-name">{tab.name}</span>
+							<input
+								class="tab-checkbox"
+								type="checkbox"
+								checked={activeTabIds.includes(tab.id)}
+								aria-label={`Incluir ${tab.name} al imprimir`}
+								onchange={() => toggleTab(tab.id)}
+							/>
+						</label>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
 		<button type="button" class="btn btn-primary action" onclick={print}>
 			<Icon name="printer" size={18} /> Imprimir
 		</button>
@@ -383,6 +429,7 @@
 			<div class="frame" style:zoom>
 				<PrintSheet
 					song={data.song}
+					tabs={activeTabs}
 					tags={songTags}
 					{settings}
 					{semitones}
@@ -669,6 +716,85 @@
 	.steps {
 		min-width: 4.5rem;
 		text-align: center;
+	}
+	.tab-group {
+		min-width: 0;
+		padding: 0.25rem 0.75rem 0.65rem;
+	}
+	.tab-heading {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		padding: 0.7rem 0.25rem;
+	}
+	.tab-heading h2 {
+		margin: 0;
+		font-size: 0.92rem;
+		font-weight: 700;
+	}
+	.tab-heading p {
+		margin: 0.2rem 0 0;
+		color: var(--color-muted);
+		font-size: 0.75rem;
+		line-height: 1.35;
+	}
+	.tab-count {
+		flex: none;
+		color: var(--color-subtle);
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		font-variant-numeric: tabular-nums;
+	}
+	.tab-count strong {
+		color: var(--color-text);
+		font-size: 1rem;
+	}
+	.tab-list {
+		display: grid;
+		max-height: min(20rem, 40vh);
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		scrollbar-color: var(--color-border) transparent;
+	}
+	.tab-choice {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		min-width: 0;
+		min-height: 2.75rem;
+		padding: 0.25rem 0.5rem;
+		border-top: 1px solid var(--color-border-soft);
+		border-radius: var(--radius-control);
+		color: var(--color-muted);
+		cursor: pointer;
+	}
+	.tab-choice.tab-active {
+		color: var(--color-text);
+	}
+	.tab-name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.tab-checkbox {
+		flex: none;
+		width: 1.125rem;
+		height: 1.125rem;
+		margin: 0;
+		border-color: var(--color-border-strong);
+		background-color: var(--color-surface-2);
+		accent-color: var(--color-bright);
+	}
+	.tab-choice:focus-within {
+		outline: 2px solid var(--color-border-strong);
+		outline-offset: -2px;
+	}
+	@media (hover: hover) {
+		.tab-choice:hover {
+			background: var(--color-surface-2);
+		}
 	}
 
 	.switch {

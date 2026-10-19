@@ -7,6 +7,36 @@
  */
 
 import type { Accidentals } from './music/chords';
+import type { SongTab } from './types';
+
+export interface PrintTabSelection {
+	songId: string;
+	tabIds: string[];
+}
+
+/** Devuelve las tablaturas elegidas para esta canción; sin selección, incluye todas. */
+export function printableTabs<T extends Pick<SongTab, 'id'>>(
+	songId: string,
+	tabs: readonly T[],
+	selection: PrintTabSelection | null
+): T[] {
+	const selectedIds = selection?.songId === songId ? new Set(selection.tabIds) : null;
+	return tabs.filter(({ id }) => selectedIds === null || selectedIds.has(id));
+}
+
+/** Alterna una tablatura sin guardar la preferencia en la canción ni compartirla con otra. */
+export function togglePrintableTab<T extends Pick<SongTab, 'id'>>(
+	songId: string,
+	tabs: readonly T[],
+	selection: PrintTabSelection | null,
+	tabId: string
+): PrintTabSelection {
+	const currentIds = printableTabs(songId, tabs, selection).map(({ id }) => id);
+	const tabIds = currentIds.includes(tabId)
+		? currentIds.filter((currentId) => currentId !== tabId)
+		: [...currentIds, tabId];
+	return { songId, tabIds };
+}
 
 export type PaperSize = 'a4' | 'oficio' | 'carta';
 
