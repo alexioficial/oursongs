@@ -67,6 +67,7 @@ describe('canciones creadas sin conexión', () => {
 			lyrics: 'Hola',
 			chords: [{ id: 'x', value: 'Am' }],
 			chordPlacements: [{ chordId: 'x', offset: 0 }],
+			tabs: [],
 			tagIds: ['t'],
 			createdAt: '2026-09-05T10:00:00.000Z',
 			updatedAt: '2026-09-05T10:00:00.000Z',
