@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/Icon.svelte';
@@ -15,20 +15,25 @@
 		parseAccidentalsParam,
 		DEFAULT_PRINT_SETTINGS,
 		isDefaultPrintSettings,
+		loadPrintTheme,
 		loadPrintSettings,
+		nextPrintTheme,
 		PAGE_MARGIN_X,
 		PAGE_MARGIN_Y,
 		PAPER_SIZES,
 		PAPERS,
 		PRINT_COLORS,
 		printableTabs,
+		resetPrintTheme,
 		savePrintSettings,
+		savePrintTheme,
 		togglePrintableTab,
 		TEXT_SCALE_MAX,
 		TEXT_SCALE_MIN,
 		TEXT_SCALE_STEP,
 		type PrintTabSelection
 	} from '$lib/print';
+	import { parseTheme, type Theme } from '$lib/theme';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -37,6 +42,20 @@
 	// el dispositivo se puede leer ya, sin pasar antes por las opciones por defecto.
 	const settings = $state(loadPrintSettings());
 	$effect(() => savePrintSettings($state.snapshot(settings)));
+	const appTheme = parseTheme(document.documentElement.dataset.theme);
+	const originalPrintTheme = document.documentElement.dataset.printTheme;
+	const initialPrintTheme = loadPrintTheme(appTheme);
+	let printTheme = $state<Theme>(initialPrintTheme.theme);
+	let hasSavedPrintTheme = $state(initialPrintTheme.isSaved);
+	// Los tokens globales pintan el exterior; se restaura el atributo al salir.
+	document.documentElement.dataset.printTheme = initialPrintTheme.theme;
+	$effect(() => {
+		document.documentElement.dataset.printTheme = printTheme;
+	});
+	onDestroy(() => {
+		if (originalPrintTheme === undefined) delete document.documentElement.dataset.printTheme;
+		else document.documentElement.dataset.printTheme = originalPrintTheme;
+	});
 	let tabSelection = $state<PrintTabSelection | null>(null);
 	const activeTabs = $derived(printableTabs(data.song.id, data.song.tabs, tabSelection));
 	const activeTabIds = $derived(activeTabs.map(({ id }) => id));
@@ -128,8 +147,16 @@
 		tabSelection = togglePrintableTab(data.song.id, data.song.tabs, tabSelection, tabId);
 	}
 
+	function togglePrintTheme() {
+		printTheme = nextPrintTheme(printTheme);
+		savePrintTheme(printTheme);
+		hasSavedPrintTheme = true;
+	}
+
 	const isDefault = $derived(
 		isDefaultPrintSettings(settings) &&
+			printTheme === appTheme &&
+			!hasSavedPrintTheme &&
 			semitones === 0 &&
 			accidentals === 'auto' &&
 			activeTabs.length === data.song.tabs.length
@@ -137,6 +164,9 @@
 
 	function reset() {
 		Object.assign(settings, DEFAULT_PRINT_SETTINGS);
+		resetPrintTheme();
+		printTheme = appTheme;
+		hasSavedPrintTheme = false;
 		semitones = 0;
 		accidentals = 'auto';
 		tabSelection = null;
@@ -205,6 +235,22 @@
 		<a class="back" href={resolve('/canciones/[id]', { id: data.song.id })}>
 			<Icon name="back" size={16} /> Volver a la canción
 		</a>
+		<div class="group">
+			<button
+				type="button"
+				class="row"
+				role="switch"
+				aria-label="Modo oscuro"
+				aria-checked={printTheme === 'dark'}
+				title={printTheme === 'dark' ? 'Desactivar modo oscuro' : 'Activar modo oscuro'}
+				onclick={togglePrintTheme}
+			>
+				<Icon name={printTheme === 'dark' ? 'moon' : 'sun'} size={20} />
+				<span class="row-label">Modo oscuro</span>
+				<span class="row-value">{printTheme === 'dark' ? 'Oscuro' : 'Claro'}</span>
+				<span class="switch" aria-hidden="true"></span>
+			</button>
+		</div>
 
 		<div class="group">
 			<div class="option">

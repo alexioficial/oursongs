@@ -8,6 +8,7 @@
 
 import type { Accidentals } from './music/chords';
 import type { SongTab } from './types';
+import type { Theme } from './theme';
 
 export interface PrintTabSelection {
 	songId: string;
@@ -196,6 +197,7 @@ export function parseAccidentalsParam(value: string | null): Accidentals {
 }
 
 const STORAGE_KEY = 'oursongs:print';
+const PRINT_THEME_STORAGE_KEY = 'oursongs:print-theme';
 
 export function loadPrintSettings(): PrintSettings {
 	try {
@@ -211,5 +213,44 @@ export function savePrintSettings(settings: PrintSettings) {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 	} catch {
 		// Sin almacenamiento las opciones duran lo que dure la pantalla.
+	}
+}
+
+export interface PrintThemePreference {
+	theme: Theme;
+	isSaved: boolean;
+}
+
+/** Sin una elección propia, la pantalla sigue el tema actual de la aplicación. */
+export function parsePrintTheme(value: string | null, appTheme: Theme): PrintThemePreference {
+	if (value === 'light' || value === 'dark') return { theme: value, isSaved: true };
+	return { theme: appTheme, isSaved: false };
+}
+
+export function nextPrintTheme(theme: Theme): Theme {
+	return theme === 'dark' ? 'light' : 'dark';
+}
+
+export function loadPrintTheme(appTheme: Theme): PrintThemePreference {
+	try {
+		return parsePrintTheme(localStorage.getItem(PRINT_THEME_STORAGE_KEY), appTheme);
+	} catch {
+		return parsePrintTheme(null, appTheme);
+	}
+}
+
+export function savePrintTheme(theme: Theme) {
+	try {
+		localStorage.setItem(PRINT_THEME_STORAGE_KEY, theme);
+	} catch {
+		// Sin almacenamiento el modo elegido solo dura lo que dure la pantalla.
+	}
+}
+
+export function resetPrintTheme() {
+	try {
+		localStorage.removeItem(PRINT_THEME_STORAGE_KEY);
+	} catch {
+		// Sin almacenamiento no hay una preferencia persistida que limpiar.
 	}
 }

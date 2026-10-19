@@ -35,7 +35,9 @@
  * negro, así que lo que resalta (botón principal, acordes, selección) sigue
  * resaltando sin tocar ningún componente.
  */
-:root[data-theme='light'] {
+/* Imprimir puede usar una paleta temporal sin cambiar el tema guardado de la app. */
+:root[data-theme='light']:not([data-print-theme='dark']),
+:root[data-print-theme='light'] {
 	--color-bg: #f7f7f7;
 	--color-surface: #ffffff;
 	--color-surface-2: #f0f0f0;
@@ -55,7 +57,8 @@
 	:root {
 		color-scheme: dark;
 	}
-	:root[data-theme='light'] {
+	:root[data-theme='light']:not([data-print-theme='dark']),
+	:root[data-print-theme='light'] {
 		color-scheme: light;
 	}
 	html {

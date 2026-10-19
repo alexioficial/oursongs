@@ -4,9 +4,14 @@ import {
 	columnCapacity,
 	DEFAULT_PRINT_SETTINGS,
 	isDefaultPrintSettings,
+	loadPrintTheme,
+	nextPrintTheme,
 	parseAccidentalsParam,
+	parsePrintTheme,
 	parsePrintSettings,
 	printableTabs,
+	resetPrintTheme,
+	savePrintTheme,
 	togglePrintableTab
 } from '../src/lib/print.ts';
 
@@ -153,6 +158,50 @@ describe('opciones de impresión', () => {
 		expect(
 			columnCapacity({ ...DEFAULT_PRINT_SETTINGS, paper: 'carta' }, 0.6)
 		).toBeGreaterThanOrEqual(base);
+	});
+});
+
+describe('tema de la pantalla de impresión', () => {
+	test('alterna entre los modos claro y oscuro', () => {
+		expect(nextPrintTheme('dark')).toBe('light');
+		expect(nextPrintTheme('light')).toBe('dark');
+	});
+
+	test('sin preferencia guardada sigue el tema actual de la app', () => {
+		expect(parsePrintTheme(null, 'light')).toEqual({ theme: 'light', isSaved: false });
+		expect(parsePrintTheme(null, 'dark')).toEqual({ theme: 'dark', isSaved: false });
+		expect(parsePrintTheme('desconocido', 'light')).toEqual({ theme: 'light', isSaved: false });
+	});
+
+	test('recuerda la elección hasta restablecerla', () => {
+		const previousStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+		const values = new Map();
+		Object.defineProperty(globalThis, 'localStorage', {
+			configurable: true,
+			value: {
+				getItem: (key) => values.get(key) ?? null,
+				setItem: (key, value) => values.set(key, String(value)),
+				removeItem: (key) => values.delete(key)
+			}
+		});
+
+		try {
+			expect(loadPrintTheme('dark')).toEqual({ theme: 'dark', isSaved: false });
+
+			savePrintTheme('light');
+			expect(values.get('oursongs:print-theme')).toBe('light');
+			expect(loadPrintTheme('dark')).toEqual({ theme: 'light', isSaved: true });
+
+			resetPrintTheme();
+			expect(values.has('oursongs:print-theme')).toBe(false);
+			expect(loadPrintTheme('dark')).toEqual({ theme: 'dark', isSaved: false });
+		} finally {
+			if (previousStorage) {
+				Object.defineProperty(globalThis, 'localStorage', previousStorage);
+			} else {
+				delete globalThis.localStorage;
+			}
+		}
 	});
 });
 
